@@ -1,0 +1,17 @@
+{
+  "name": "gloq-space-allocation",
+  "private": true,
+  "packageManager": "pnpm@10.32.1",
+  "scripts": {
+    "dev:web": "corepack pnpm --filter web dev",
+    "dev:3001": "corepack pnpm --filter web dev:3001",
+    "dev:api": "cargo run -p gloq-api",
+    "build:wasm": "wasm-pack build crates/render-wasm --target web --out-dir pkg",
+    "dev": "concurrently -n web,api -c blue,green \"corepack pnpm run dev:web\" \"corepack pnpm run dev:api\"",
+    "lint": "corepack pnpm --filter web lint && cargo fmt --check && cargo clippy -p gloq-api --all-targets -- -D warnings",
+    "test": "corepack pnpm --filter web lint && cargo test -p gloq-api"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
+}
