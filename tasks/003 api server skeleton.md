@@ -439,3 +439,175 @@ Task được xem là hoàn tất khi:
 5. `GET /api/health` và `GET /api/version` chạy dưới `/api`
 6. `/api/*` route không tồn tại trả JSON error ổn định
 7. `cargo test -p gloq-api` pass
+
+## Context cập nhật sau khi triển khai
+
+Task này đã được triển khai trong `apps/api` với phạm vi đúng theo yêu cầu ban đầu.
+
+### Files nguồn hiện tại
+
+- `Cargo.toml`
+- `apps/api/Cargo.toml`
+- `apps/api/src/main.rs`
+- `apps/api/src/config.rs`
+- `apps/api/src/error.rs`
+
+### Những gì đã ship
+
+#### Config loading
+
+Config runtime hiện tại được load từ env qua `AppConfig::from_env()` trong `apps/api/src/config.rs`.
+
+Biến env đang dùng:
+
+- `API_HOST`, default `127.0.0.1`
+- `API_PORT`, default `4000`
+- `DATABASE_URL`, bắt buộc
+
+Không thêm:
+
+- `.env` loader
+- config framework
+- runtime CORS env
+
+#### Startup behavior
+
+Luồng boot hiện tại trong `apps/api/src/main.rs` là:
+
+1. load `AppConfig`
+2. init tracing
+3. connect Postgres pool
+4. bind TCP listener
+5. serve axum router
+
+Server hiện fail-fast khi:
+
+- thiếu `DATABASE_URL`
+- `API_PORT` parse lỗi
+- connect Postgres thất bại
+
+#### App state
+
+`AppState` hiện chỉ giữ:
+
+```rust
+struct AppState {
+    pool: PgPool,
+}
+```
+
+Điều này giữ state ở mức tối thiểu và không thêm service/repository container.
+
+#### Router và middleware
+
+Router hiện tại:
+
+```text
+/
+└── /api
+    ├── /health
+    ├── /version
+    └── fallback -> JSON 404
+```
+
+Middleware hiện tại:
+
+- `CorsLayer`
+- `TraceLayer::new_for_http()`
+
+#### CORS policy hiện tại
+
+CORS đang allow đúng các local web origins đã tồn tại trong repo tại thời điểm triển khai:
+
+- `http://localhost:5173`
+- `http://127.0.0.1:5173`
+- `http://localhost:3001`
+- `http://127.0.0.1:3001`
+
+Methods hiện allow:
+
+- `GET`
+- `OPTIONS`
+
+#### JSON error behavior hiện tại
+
+`ApiError` đang được dùng để trả JSON error cho fallback `/api/*`.
+
+Shape hiện tại:
+
+```json
+{
+  "error": {
+    "code": "not_found",
+    "message": "Route not found."
+  }
+}
+```
+
+Trong implementation hiện tại, `ApiError` mới được dùng cho API surface chứ chưa dùng cho startup errors.
+
+#### Endpoints hiện tại
+
+`GET /api/health`
+
+- trả `200`
+- body:
+
+```json
+{
+  "status": "ok"
+}
+```
+
+`GET /api/version`
+
+- trả `200`
+- body dùng metadata từ Cargo package:
+
+```json
+{
+  "name": "gloq-api",
+  "version": "0.1.0"
+}
+```
+
+### Test coverage hiện tại
+
+Các test hiện có trong `apps/api/src/main.rs`:
+
+1. `GET /api/health`
+2. `GET /api/version`
+3. JSON 404 fallback cho `/api/*`
+4. CORS header cho local web origin
+
+### Verification đã chạy
+
+Lệnh đã chạy:
+
+```bash
+cargo fmt --all
+cargo test -p gloq-api
+cargo clippy -p gloq-api --all-targets -- -D warnings
+```
+
+Kết quả:
+
+- `cargo test -p gloq-api` pass
+- `cargo clippy -p gloq-api --all-targets -- -D warnings` pass
+
+Manual smoke với `cargo run -p gloq-api` chưa được xác nhận end-to-end trong task vì chưa cung cấp `DATABASE_URL` thật tại thời điểm triển khai.
+
+## Kinh nghiệm / ghi chú vận hành
+
+- Với workspace Rust hiện tại, dependency middleware nên được thêm ở root `Cargo.toml` rồi bật `*.workspace = true` ở `apps/api/Cargo.toml`. Cách này khớp pattern repo và tránh drift version.
+- Với API persistence skeleton, `DATABASE_URL` nên là bắt buộc. Boot ở trạng thái degraded với `Option<PgPool>` làm mờ lỗi cấu hình và không có ích cho scope MVP này.
+- `tower-http` là đủ cho `CORS` và HTTP tracing ở giai đoạn này. Chưa có lý do thêm stack observability khác.
+- Local CORS policy nên bám các port đã tồn tại trong repo thay vì mở rộng theo suy đoán. Ở thời điểm triển khai, các port có cơ sở là `5173` và `3001` từ web package.
+- Route tests có thể tránh phụ thuộc Postgres thật bằng `connect_lazy()` miễn là handler không query DB. Cách này đủ tốt cho skeleton HTTP behavior.
+- Chưa cần thêm `dotenv`, `anyhow`, `thiserror`, repository layer, hay service layer. Với scope hiện tại, chúng chỉ tăng abstraction count.
+
+## Remaining TODOs
+
+- chạy `cargo run -p gloq-api` với `DATABASE_URL` thật để smoke test startup và bind HTTP end-to-end
+- mở rộng `ApiError` khi có endpoint application thật thay vì dự đoán trước error taxonomy
+- bổ sung auth-aware routes và persistence endpoints ở task sau, không nhét vào skeleton này
