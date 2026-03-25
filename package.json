@@ -9,7 +9,7 @@
     "build:wasm": "wasm-pack build crates/render-wasm --target web --out-dir pkg",
     "dev": "concurrently -n web,api -c blue,green \"corepack pnpm run dev:web\" \"corepack pnpm run dev:api\"",
     "lint": "corepack pnpm --filter web lint && cargo fmt --check && cargo clippy -p gloq-api --all-targets -- -D warnings",
-    "test": "corepack pnpm --filter web lint && cargo test -p gloq-api"
+    "test": "corepack pnpm --filter web test && corepack pnpm --filter web lint && cargo test -p gloq-api"
   },
   "devDependencies": {
     "concurrently": "^9.2.1"

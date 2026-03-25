@@ -26,6 +26,43 @@ let clientError: string | null = null;
 let bootstrapPromise: Promise<void> | null = null;
 let authSubscription: { unsubscribe: () => void } | null = null;
 
+function isLocalDevAuthBypassed(): boolean {
+  if (!import.meta.env.DEV) {
+    return false;
+  }
+
+  if (import.meta.env.VITE_LOCAL_AUTH_BYPASS?.trim().toLowerCase() !== "true") {
+    return false;
+  }
+
+  if (typeof window === "undefined") {
+    return true;
+  }
+
+  return window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+}
+
+function getLocalDevUser(): User {
+  return {
+    id: "local-dev-user",
+    app_metadata: { provider: "email" },
+    user_metadata: { name: "Local Dev" },
+    aud: "authenticated",
+    created_at: "1970-01-01T00:00:00.000Z",
+    email: "local-dev@gloq.local"
+  } as User;
+}
+
+function applyLocalDevBypass() {
+  setSnapshot({
+    status: "signed_in",
+    session: null,
+    user: getLocalDevUser(),
+    error: null,
+    pendingEmail: ""
+  });
+}
+
 function emitChange() {
   for (const listener of listeners) {
     listener();
@@ -105,6 +142,11 @@ export async function bootstrapAuth(): Promise<void> {
   }
 
   bootstrapPromise = (async () => {
+    if (isLocalDevAuthBypassed()) {
+      applyLocalDevBypass();
+      return;
+    }
+
     const clientResult = getSupabaseClient();
 
     if (!clientResult.client) {
@@ -145,6 +187,11 @@ export async function bootstrapAuth(): Promise<void> {
 }
 
 export async function sendLoginEmail(email: string): Promise<{ error: string | null }> {
+  if (isLocalDevAuthBypassed()) {
+    applyLocalDevBypass();
+    return { error: null };
+  }
+
   await bootstrapAuth();
 
   const clientResult = getSupabaseClient();
@@ -185,6 +232,11 @@ export async function sendLoginEmail(email: string): Promise<{ error: string | n
 }
 
 export async function verifyEmailOtp(email: string, token: string): Promise<{ error: string | null }> {
+  if (isLocalDevAuthBypassed()) {
+    applyLocalDevBypass();
+    return { error: null };
+  }
+
   await bootstrapAuth();
 
   const clientResult = getSupabaseClient();
@@ -227,6 +279,11 @@ export async function verifyEmailOtp(email: string, token: string): Promise<{ er
 }
 
 export async function logout(): Promise<{ error: string | null }> {
+  if (isLocalDevAuthBypassed()) {
+    applyLocalDevBypass();
+    return { error: null };
+  }
+
   await bootstrapAuth();
 
   const clientResult = getSupabaseClient();
