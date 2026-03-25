@@ -4,8 +4,11 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
+    "predev": "corepack pnpm --dir ../.. build:wasm",
     "dev": "vite",
+    "predev:3001": "corepack pnpm --dir ../.. build:wasm",
     "dev:3001": "tsc --noEmit && vite --port 3001 --strictPort",
+    "prebuild": "corepack pnpm --dir ../.. build:wasm",
     "build": "tsc --noEmit && vite build",
     "lint": "tsc --noEmit",
     "test": "vitest run"

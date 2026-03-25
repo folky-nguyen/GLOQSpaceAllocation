@@ -36,11 +36,17 @@ type DragMode = "orbit" | "pan";
 let renderWasmModulePromise: Promise<RenderWasmModule> | null = null;
 
 function getErrorMessage(error: unknown): string {
-  if (error instanceof Error) {
-    return error.message;
+  const rawMessage = error instanceof Error
+    ? error.message
+    : typeof error === "string"
+      ? error
+      : "Renderer initialization failed.";
+
+  if (rawMessage.includes("Failed to parse JSON payload")) {
+    return "Renderer payload mismatch. Run `pnpm build:wasm` and restart the web app.";
   }
 
-  return typeof error === "string" ? error : "Renderer initialization failed.";
+  return rawMessage;
 }
 
 async function loadRenderWasmModule(): Promise<RenderWasmModule> {
@@ -315,7 +321,7 @@ export default function ThreeDViewport({
       : phase === "error"
         ? errorMessage
         : phase === "empty"
-          ? "Add spaces to the project to generate 3D massing boxes."
+          ? "Add spaces to the project to generate 3D polygon extrusions."
           : null;
 
   return (

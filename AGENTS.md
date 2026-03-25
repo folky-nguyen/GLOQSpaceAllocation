@@ -102,6 +102,7 @@ Hard architecture rules:
 - Keep internal length math in decimal feet. Feet-inch parsing and formatting are UI-only.
 - Add tests only for pure logic or critical API behavior.
 - Do not invent a second sample-data schema for editor validation; keep sample files aligned with canonical `ProjectDoc` snapshots.
+- If you change the wasm renderer contract or `crates/render-wasm/src/lib.rs`, rebuild `crates/render-wasm/pkg` in the same task before claiming web verification is complete.
 - After each task, run the smallest relevant build or test, fix obvious breakages, then report:
   1. changed files
   2. commands run
