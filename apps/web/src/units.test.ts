@@ -15,28 +15,54 @@ function expectFeetCloseTo(actual: number | null, expected: number) {
 }
 
 describe("parseFeetAndInches", () => {
-  it("parses the required supported samples", () => {
+  it("parses the required supported samples and shorthand follow-ups", () => {
     expectFeetCloseTo(parseFeetAndInches("12'"), 12);
+    expectFeetCloseTo(parseFeetAndInches("12'6\""), 12.5);
     expectFeetCloseTo(parseFeetAndInches("12' 6\""), 12.5);
     expectFeetCloseTo(parseFeetAndInches("12'-6 1/2\""), 12 + 6.5 / 12);
+    expectFeetCloseTo(parseFeetAndInches("12' -6\""), 12.5);
+    expectFeetCloseTo(parseFeetAndInches("12'- 6 1/2\""), 12 + 6.5 / 12);
+    expectFeetCloseTo(parseFeetAndInches("12 6"), 12.5);
+    expectFeetCloseTo(parseFeetAndInches("12 6\""), 12.5);
+    expectFeetCloseTo(parseFeetAndInches("12 3 3/4"), 12 + 3.75 / 12);
+    expectFeetCloseTo(parseFeetAndInches("12 3 3/4\""), 12 + 3.75 / 12);
     expectFeetCloseTo(parseFeetAndInches("7 1/4\""), 7.25 / 12);
+    expectFeetCloseTo(parseFeetAndInches("7 1/4"), 7.25 / 12);
     expectFeetCloseTo(parseFeetAndInches("9.5'"), 9.5);
     expectFeetCloseTo(parseFeetAndInches("-1' 6\""), -1.5);
+    expectFeetCloseTo(parseFeetAndInches("-12 3 3/4"), -(12 + 3.75 / 12));
+  });
+
+  it("normalizes alias inches markers, repeated spaces, and unicode prime glyphs", () => {
+    expectFeetCloseTo(parseFeetAndInches("7''"), 7 / 12);
+    expectFeetCloseTo(parseFeetAndInches("12' 3''"), 12.25);
+    expectFeetCloseTo(parseFeetAndInches("12 3 3/4''"), 12 + 3.75 / 12);
+    expectFeetCloseTo(parseFeetAndInches("12  3   3/4"), 12 + 3.75 / 12);
+    expectFeetCloseTo(parseFeetAndInches("12\u2032 6\u2033"), 12.5);
   });
 
   it("accepts inch overflow and normalizes through total inches", () => {
     expectFeetCloseTo(parseFeetAndInches("14\""), 14 / 12);
-    expectFeetCloseTo(parseFeetAndInches("5' 14\""), 6 + 2 / 12);
+    expectFeetCloseTo(parseFeetAndInches("5'14\""), 6 + 2 / 12);
+    expectFeetCloseTo(parseFeetAndInches("5 14"), 6 + 2 / 12);
+    expectFeetCloseTo(parseFeetAndInches("12 15 3/4"), 13 + 3.75 / 12);
   });
 
-  it("rejects invalid inputs", () => {
+  it("rejects ambiguous or malformed inputs", () => {
     expect(parseFeetAndInches("")).toBeNull();
     expect(parseFeetAndInches("12")).toBeNull();
+    expect(parseFeetAndInches("9.5")).toBeNull();
     expect(parseFeetAndInches("abc")).toBeNull();
     expect(parseFeetAndInches("1' 2/0\"")).toBeNull();
-    expect(parseFeetAndInches("1' -2\"")).toBeNull();
+    expect(parseFeetAndInches("1'--2\"")).toBeNull();
     expect(parseFeetAndInches("1 1/2'")).toBeNull();
     expect(parseFeetAndInches("\"")).toBeNull();
+    expect(parseFeetAndInches("12.5 6")).toBeNull();
+    expect(parseFeetAndInches("12 3.5")).toBeNull();
+    expect(parseFeetAndInches("12 3 3/4 1/2")).toBeNull();
+    expect(parseFeetAndInches("12'6")).toBeNull();
+    expect(parseFeetAndInches("12'''")).toBeNull();
+    expect(parseFeetAndInches("1/4 7")).toBeNull();
   });
 });
 
@@ -53,6 +79,21 @@ describe("formatFeetAndInches", () => {
   it("supports denominator changes and inch overflow carry", () => {
     expect(formatFeetAndInches(7.25 / 12, { inchDenominator: 4 })).toBe("7 1/4\"");
     expect(formatFeetAndInches(11 + 11.96875 / 12)).toBe("12'");
+  });
+
+  it("normalizes shorthand parsing back to canonical display output", () => {
+    const shorthandSamples = [
+      ["12'6\"", "12' 6\""],
+      ["7''", "7\""],
+      ["12 3 3/4", "12' 3 3/4\""],
+      ["12 3 3/4''", "12' 3 3/4\""]
+    ] as const;
+
+    for (const [sample, expected] of shorthandSamples) {
+      const parsed = parseFeetAndInches(sample);
+      expect(parsed).not.toBeNull();
+      expect(formatFeetAndInches(parsed as number)).toBe(expected);
+    }
   });
 });
 
@@ -71,12 +112,16 @@ describe("conversion and area helpers", () => {
 });
 
 describe("round-trip behavior", () => {
-  it("round-trips supported samples through normalized formatting", () => {
+  it("round-trips supported explicit and shorthand samples through normalized formatting", () => {
     const samples = [
       "12'",
+      "12'6\"",
       "12' 6\"",
       "12'-6 1/2\"",
-      "7 1/4\"",
+      "12 6",
+      "12 3 3/4",
+      "7 1/4",
+      "7''",
       "9.5'",
       "-1' 6\""
     ];

@@ -5,6 +5,10 @@
   "scripts": {
     "dev:web": "corepack pnpm --filter web dev",
     "dev:3001": "corepack pnpm --filter web dev:3001",
+    "up:web:3001": "node ./setup/up-web-3001.mjs",
+    "down:web:3001": "node ./setup/down-web-3001.mjs",
+    "verify:web": "corepack pnpm --filter web build",
+    "smoke:web:3001": "node ./setup/check-web-3001.mjs",
     "dev:api": "cargo run -p gloq-api",
     "build:wasm": "wasm-pack build crates/render-wasm --target web --out-dir pkg",
     "dev": "concurrently -n web,api -c blue,green \"corepack pnpm run dev:web\" \"corepack pnpm run dev:api\"",

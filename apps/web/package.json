@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "dev:3001": "vite --port 3001 --strictPort",
+    "dev:3001": "tsc --noEmit && vite --port 3001 --strictPort",
     "build": "tsc --noEmit && vite build",
     "lint": "tsc --noEmit",
     "test": "vitest run"

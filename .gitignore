@@ -10,4 +10,5 @@ Thumbs.db
 !.env.example
 supabase/.temp/
 supabase/.branches/
-
+setup/*.log
+setup/*.pid

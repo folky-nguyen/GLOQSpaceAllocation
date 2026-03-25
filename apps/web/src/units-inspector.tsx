@@ -15,8 +15,11 @@ type UnitsInspectorProps = {
 
 const sampleInputs = [
   "12'",
+  "12'6\"",
   "12' 6\"",
   "12'-6 1/2\"",
+  "12 3 3/4",
+  "7''",
   "7 1/4\"",
   "9.5'"
 ] as const;
@@ -42,7 +45,7 @@ function formatNumber(value: number, maximumFractionDigits = 6): string {
 }
 
 export default function UnitsInspector({ open, onClose }: UnitsInspectorProps) {
-  const [parseInput, setParseInput] = useState("12'-6 1/2\"");
+  const [parseInput, setParseInput] = useState("12 3 3/4");
   const [feetInput, setFeetInput] = useState("12.5");
   const [inchDenominator, setInchDenominator] = useState<InchDenominator>(16);
   const [metersInput, setMetersInput] = useState("3.048");
@@ -113,6 +116,16 @@ export default function UnitsInspector({ open, onClose }: UnitsInspectorProps) {
             </button>
           ))}
         </div>
+
+        <p className="units-inspector-note">
+          <code>''</code>
+          {" "}
+          is treated as inches. Markerless shorthand like
+          {" "}
+          <code>12 3 3/4</code>
+          {" "}
+          is read as feet, inches, fraction.
+        </p>
 
         <dl className="units-result-list">
           <div>

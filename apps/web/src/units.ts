@@ -1,27 +1,33 @@
 export const METERS_PER_FOOT = 0.3048;
 
 const DEFAULT_INCH_DENOMINATOR = 16;
-const FEET_SUBDIVISIONS_PER_FOOT = 12;
+const INCHES_PER_FOOT = 12;
 const FEET_ONLY_PATTERN = /^(\d+(?:\.\d+)?)'$/;
-const FEET_AND_INCHES_PATTERNS = [
-  /^(\d+(?:\.\d+)?)'\s+-\s+(.+)"$/,
-  /^(\d+(?:\.\d+)?)'-(.+)"$/,
-  /^(\d+(?:\.\d+)?)'\s+(.+)"$/
-] as const;
+const EXPLICIT_FEET_PATTERN = /^(\d+(?:\.\d+)?)'(.*)$/;
 const INCHES_ONLY_PATTERN = /^(.+)"$/;
+const INTEGER_PATTERN = /^\d+$/;
+const DECIMAL_PATTERN = /^\d+(?:\.\d+)?$/;
+const FRACTION_PATTERN = /^(\d+)\/(\d+)$/;
+const SINGLE_QUOTE_NORMALIZER = /[\u2018\u2019\u2032\u2035]/g;
+const DOUBLE_QUOTE_NORMALIZER = /[\u201C\u201D\u2033\u2036]/g;
 
 export type InchDenominator = 2 | 4 | 8 | 16;
 
-function parseUnsignedDecimal(text: string): number | null {
-  if (!/^\d+(?:\.\d+)?$/.test(text)) {
-    return null;
-  }
+type LengthParts = {
+  feet: number;
+  inches: number;
+};
 
-  return Number(text);
+function parseIntegerToken(text: string): number | null {
+  return INTEGER_PATTERN.test(text) ? Number(text) : null;
 }
 
-function parseFraction(text: string): number | null {
-  const match = /^(\d+)\/(\d+)$/.exec(text);
+function parseUnsignedDecimal(text: string): number | null {
+  return DECIMAL_PATTERN.test(text) ? Number(text) : null;
+}
+
+function parseFractionToken(text: string): number | null {
+  const match = FRACTION_PATTERN.exec(text);
 
   if (!match) {
     return null;
@@ -44,47 +50,61 @@ function parseInchesComponent(text: string): number | null {
     return null;
   }
 
-  const wholeAndFractionMatch = /^(\d+)\s+(\d+)\/(\d+)$/.exec(value);
+  const tokens = value.split(" ");
 
-  if (wholeAndFractionMatch) {
-    const wholeInches = Number(wholeAndFractionMatch[1]);
-    const fraction = parseFraction(`${wholeAndFractionMatch[2]}/${wholeAndFractionMatch[3]}`);
-    return fraction === null ? null : wholeInches + fraction;
+  if (tokens.length === 1) {
+    const fraction = parseFractionToken(tokens[0]);
+
+    if (fraction !== null) {
+      return fraction;
+    }
+
+    return parseIntegerToken(tokens[0]);
   }
 
-  const fraction = parseFraction(value);
-
-  if (fraction !== null) {
-    return fraction;
+  if (tokens.length !== 2) {
+    return null;
   }
 
-  if (/^\d+$/.test(value)) {
-    return Number(value);
+  const wholeInches = parseIntegerToken(tokens[0]);
+  const fraction = parseFractionToken(tokens[1]);
+
+  if (wholeInches === null || fraction === null) {
+    return null;
   }
 
-  return null;
+  return wholeInches + fraction;
+}
+
+function normalizeImperialInput(input: string): string {
+  return input
+    .trim()
+    .replace(SINGLE_QUOTE_NORMALIZER, "'")
+    .replace(DOUBLE_QUOTE_NORMALIZER, "\"")
+    .replace(/''/g, "\"")
+    .replace(/\s+/g, " ");
 }
 
 function normalizeSignedInput(input: string): { sign: 1 | -1; body: string } | null {
-  const trimmed = input.trim();
+  const normalized = normalizeImperialInput(input);
 
-  if (!trimmed) {
+  if (!normalized) {
     return null;
   }
 
-  if (trimmed.startsWith("-")) {
-    const body = trimmed.slice(1).trimStart();
+  if (normalized.startsWith("-")) {
+    const body = normalized.slice(1).trimStart();
     return body ? { sign: -1, body } : null;
   }
 
-  if (trimmed.startsWith("+")) {
+  if (normalized.startsWith("+")) {
     return null;
   }
 
-  return { sign: 1, body: trimmed };
+  return { sign: 1, body: normalized };
 }
 
-function parseFeetAndInchesParts(body: string): { feet: number; inches: number } | null {
+function parseExplicitImperial(body: string): LengthParts | null {
   const feetOnlyMatch = FEET_ONLY_PATTERN.exec(body);
 
   if (feetOnlyMatch) {
@@ -92,21 +112,29 @@ function parseFeetAndInchesParts(body: string): { feet: number; inches: number }
     return feet === null ? null : { feet, inches: 0 };
   }
 
-  for (const pattern of FEET_AND_INCHES_PATTERNS) {
-    const match = pattern.exec(body);
+  const explicitFeetMatch = EXPLICIT_FEET_PATTERN.exec(body);
 
-    if (!match) {
-      continue;
-    }
+  if (explicitFeetMatch) {
+    const feet = parseUnsignedDecimal(explicitFeetMatch[1]);
 
-    const feet = parseUnsignedDecimal(match[1]);
-    const inches = parseInchesComponent(match[2]);
-
-    if (feet === null || inches === null) {
+    if (feet === null) {
       return null;
     }
 
-    return { feet, inches };
+    const remainder = explicitFeetMatch[2];
+
+    if (!remainder.trim()) {
+      return { feet, inches: 0 };
+    }
+
+    const explicitInchesMatch = /^\s*-?\s*(.+)"$/.exec(remainder);
+
+    if (!explicitInchesMatch) {
+      return null;
+    }
+
+    const inches = parseInchesComponent(explicitInchesMatch[1]);
+    return inches === null ? null : { feet, inches };
   }
 
   const inchesOnlyMatch = INCHES_ONLY_PATTERN.exec(body);
@@ -117,6 +145,68 @@ function parseFeetAndInchesParts(body: string): { feet: number; inches: number }
 
   const inches = parseInchesComponent(inchesOnlyMatch[1]);
   return inches === null ? null : { feet: 0, inches };
+}
+
+function tokenizeMarkerlessShorthand(body: string): string[] | null {
+  if (!body) {
+    return null;
+  }
+
+  let candidate = body;
+
+  if (candidate.includes("'")) {
+    return null;
+  }
+
+  if (candidate.endsWith("\"")) {
+    candidate = candidate.slice(0, -1).trimEnd();
+  }
+
+  if (!candidate || candidate.includes("\"")) {
+    return null;
+  }
+
+  return candidate.split(" ");
+}
+
+function parseMarkerlessShorthand(body: string): LengthParts | null {
+  const tokens = tokenizeMarkerlessShorthand(body);
+
+  if (!tokens || tokens.length < 2 || tokens.length > 3) {
+    return null;
+  }
+
+  if (tokens.length === 2) {
+    const leftInteger = parseIntegerToken(tokens[0]);
+
+    if (leftInteger === null) {
+      return null;
+    }
+
+    const rightInteger = parseIntegerToken(tokens[1]);
+
+    if (rightInteger !== null) {
+      return { feet: leftInteger, inches: rightInteger };
+    }
+
+    const fraction = parseFractionToken(tokens[1]);
+
+    if (fraction !== null) {
+      return { feet: 0, inches: leftInteger + fraction };
+    }
+
+    return null;
+  }
+
+  const feet = parseIntegerToken(tokens[0]);
+  const wholeInches = parseIntegerToken(tokens[1]);
+  const fraction = parseFractionToken(tokens[2]);
+
+  if (feet === null || wholeInches === null || fraction === null) {
+    return null;
+  }
+
+  return { feet, inches: wholeInches + fraction };
 }
 
 function getGreatestCommonDivisor(left: number, right: number): number {
@@ -137,7 +227,7 @@ function getInchDenominator(denominator: InchDenominator | undefined): InchDenom
 }
 
 function toMixedInchesParts(totalSubdivisionInches: number, denominator: InchDenominator) {
-  const subdivisionsPerFoot = FEET_SUBDIVISIONS_PER_FOOT * denominator;
+  const subdivisionsPerFoot = INCHES_PER_FOOT * denominator;
   const feet = Math.floor(totalSubdivisionInches / subdivisionsPerFoot);
   const inchesSubdivisions = totalSubdivisionInches - feet * subdivisionsPerFoot;
   const wholeInches = Math.floor(inchesSubdivisions / denominator);
@@ -185,13 +275,14 @@ export function parseFeetAndInches(input: string): number | null {
     return null;
   }
 
-  const parts = parseFeetAndInchesParts(normalizedInput.body);
+  const parts = parseExplicitImperial(normalizedInput.body)
+    ?? parseMarkerlessShorthand(normalizedInput.body);
 
   if (!parts) {
     return null;
   }
 
-  return normalizedInput.sign * (parts.feet + parts.inches / FEET_SUBDIVISIONS_PER_FOOT);
+  return normalizedInput.sign * (parts.feet + parts.inches / INCHES_PER_FOOT);
 }
 
 export function formatFeetAndInches(
@@ -200,7 +291,7 @@ export function formatFeetAndInches(
 ): string {
   const denominator = getInchDenominator(options?.inchDenominator);
   const totalSubdivisionInches = roundInchesToDenominator(
-    Math.abs(lengthFt) * FEET_SUBDIVISIONS_PER_FOOT,
+    Math.abs(lengthFt) * INCHES_PER_FOOT,
     denominator
   );
 

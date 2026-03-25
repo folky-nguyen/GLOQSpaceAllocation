@@ -2,18 +2,6 @@ import { getAreaSqFt } from "./units";
 
 export const DEFAULT_STORY_HEIGHT_FT = 10;
 
-const LEVEL_ID_PATTERN = /^level-(\d+)$/i;
-const LEVEL_NAME_PATTERN = /^Level (\d+)$/;
-
-export type ProjectDoc = {
-  projectId: string;
-  name: string;
-  units: "imperial-ft-in";
-  defaultStoryHeightFt: number;
-  levels: Level[];
-  spaces: Space[];
-};
-
 export type Level = {
   id: string;
   name: string;
@@ -31,6 +19,14 @@ export type Space = {
   depthFt: number;
 };
 
+export type ProjectDoc = {
+  id: string;
+  name: string;
+  defaultStoryHeightFt: number;
+  levels: Level[];
+  spaces: Space[];
+};
+
 export type AutoGenerateLevelsInput = {
   storiesBelowGrade: number;
   storiesOnGrade: number;
@@ -42,61 +38,90 @@ export type LevelMutationResult = {
   activeLevelId: string;
 };
 
+type GeneratedLevelSpec = {
+  name: string;
+  elevationFt: number;
+  heightFt: number;
+};
+
 function getPositiveFeetOrFallback(value: number, fallback: number): number {
   return Number.isFinite(value) && value > 0 ? value : fallback;
 }
 
 function getStoryCount(value: number): number {
-  return Number.isFinite(value) && value > 0 ? Math.floor(value) : 0;
+  if (!Number.isFinite(value)) {
+    return 0;
+  }
+
+  return Math.max(0, Math.floor(value));
 }
 
 function createLevelIdFactory(levels: Level[]): () => string {
-  let nextNumber = levels.reduce((maxNumber, level) => {
-    const match = LEVEL_ID_PATTERN.exec(level.id);
-    return match ? Math.max(maxNumber, Number(match[1])) : maxNumber;
-  }, 0);
+  const usedIds = new Set(levels.map((level) => level.id));
+  let nextId = levels.reduce((highestId, level) => {
+    const match = /^level-(\d+)$/.exec(level.id);
+    return match ? Math.max(highestId, Number(match[1])) : highestId;
+  }, 0) + 1;
 
   return () => {
-    nextNumber += 1;
-    return `level-${String(nextNumber).padStart(2, "0")}`;
+    while (usedIds.has(`level-${nextId}`)) {
+      nextId += 1;
+    }
+
+    const id = `level-${nextId}`;
+    usedIds.add(id);
+    nextId += 1;
+    return id;
   };
 }
 
 function getNextManualLevelName(levels: Level[]): string {
-  const nextNumber = levels.reduce((maxNumber, level) => {
-    const match = LEVEL_NAME_PATTERN.exec(level.name);
-    return match ? Math.max(maxNumber, Number(match[1])) : maxNumber;
-  }, 0) + 1;
+  const usedNames = new Set(levels.map((level) => level.name));
+  let nextIndex = 1;
 
-  return `Level ${nextNumber}`;
+  while (usedNames.has(`Level ${nextIndex}`)) {
+    nextIndex += 1;
+  }
+
+  return `Level ${nextIndex}`;
 }
 
-function swapItems<T>(items: readonly T[], leftIndex: number, rightIndex: number): T[] {
+function swapItems<T>(items: T[], leftIndex: number, rightIndex: number): T[] {
   const nextItems = [...items];
-  const leftValue = nextItems[leftIndex];
+  const leftItem = nextItems[leftIndex];
+
   nextItems[leftIndex] = nextItems[rightIndex];
-  nextItems[rightIndex] = leftValue;
+  nextItems[rightIndex] = leftItem;
+
   return nextItems;
 }
 
-function buildGeneratedLevelSpecs(input: AutoGenerateLevelsInput): Array<Pick<Level, "name" | "elevationFt" | "heightFt">> {
+function buildGeneratedLevelSpecs(input: AutoGenerateLevelsInput): GeneratedLevelSpec[] {
   const storiesBelowGrade = getStoryCount(input.storiesBelowGrade);
   const storiesOnGrade = getStoryCount(input.storiesOnGrade);
   const storyHeightFt = getPositiveFeetOrFallback(input.storyHeightFt, DEFAULT_STORY_HEIGHT_FT);
-  const levels: Array<Pick<Level, "name" | "elevationFt" | "heightFt">> = [];
+  const levels: GeneratedLevelSpec[] = [];
 
-  for (let basementIndex = storiesBelowGrade; basementIndex >= 1; basementIndex -= 1) {
+  for (let story = storiesBelowGrade; story >= 1; story -= 1) {
     levels.push({
-      name: `Basement ${basementIndex}`,
-      elevationFt: -basementIndex * storyHeightFt,
+      name: `Basement ${story}`,
+      elevationFt: -story * storyHeightFt,
       heightFt: storyHeightFt
     });
   }
 
-  for (let levelNumber = 1; levelNumber <= storiesOnGrade; levelNumber += 1) {
+  for (let story = 1; story <= storiesOnGrade; story += 1) {
     levels.push({
-      name: `Level ${levelNumber}`,
-      elevationFt: (levelNumber - 1) * storyHeightFt,
+      name: `Level ${story}`,
+      elevationFt: (story - 1) * storyHeightFt,
+      heightFt: storyHeightFt
+    });
+  }
+
+  if (levels.length === 0) {
+    levels.push({
+      name: "Level 1",
+      elevationFt: 0,
       heightFt: storyHeightFt
     });
   }
@@ -104,21 +129,22 @@ function buildGeneratedLevelSpecs(input: AutoGenerateLevelsInput): Array<Pick<Le
   return levels;
 }
 
-function getPreferredGeneratedLevelName(levels: Array<Pick<Level, "name">>): string {
+function getPreferredGeneratedLevelName(levels: GeneratedLevelSpec[]): string {
   return levels.find((level) => level.name === "Level 1")?.name
     ?? levels.at(-1)?.name
     ?? "Level 1";
 }
 
 export function createStarterProjectDoc(): ProjectDoc {
+  const levelId = "level-1";
+
   return {
-    projectId: "project-starter",
-    name: "GLOQ Starter Floor",
-    units: "imperial-ft-in",
+    id: "project-starter",
+    name: "GLOQ Tower",
     defaultStoryHeightFt: DEFAULT_STORY_HEIGHT_FT,
     levels: [
       {
-        id: "level-01",
+        id: levelId,
         name: "Level 1",
         elevationFt: 0,
         heightFt: DEFAULT_STORY_HEIGHT_FT
@@ -127,36 +153,45 @@ export function createStarterProjectDoc(): ProjectDoc {
     spaces: [
       {
         id: "space-lobby",
-        levelId: "level-01",
+        levelId,
         name: "Lobby",
         xFt: 0,
         yFt: 0,
-        widthFt: 24,
-        depthFt: 18
+        widthFt: 18,
+        depthFt: 14
       },
       {
-        id: "space-studio",
-        levelId: "level-01",
-        name: "Studio",
-        xFt: 24,
+        id: "space-conference",
+        levelId,
+        name: "Conference",
+        xFt: 20,
         yFt: 0,
-        widthFt: 32,
-        depthFt: 24
+        widthFt: 16,
+        depthFt: 12
+      },
+      {
+        id: "space-open-office",
+        levelId,
+        name: "Open Office",
+        xFt: 0,
+        yFt: 16,
+        widthFt: 24,
+        depthFt: 18
       }
     ]
   };
 }
 
-export function getLevelById(doc: ProjectDoc, levelId: string | null | undefined): Level | null {
-  if (!levelId) {
-    return null;
-  }
-
+export function getLevelById(doc: ProjectDoc, levelId: string): Level | null {
   return doc.levels.find((level) => level.id === levelId) ?? null;
 }
 
 export function getValidActiveLevelId(doc: ProjectDoc, activeLevelId: string | null | undefined): string {
-  return getLevelById(doc, activeLevelId)?.id ?? doc.levels[0]?.id ?? "";
+  if (activeLevelId && doc.levels.some((level) => level.id === activeLevelId)) {
+    return activeLevelId;
+  }
+
+  return doc.levels[0]?.id ?? "";
 }
 
 export function getLevelSpaces(doc: ProjectDoc, levelId: string): Space[] {
@@ -167,40 +202,106 @@ export function getSpaceAreaSqFt(space: Space): number {
   return getAreaSqFt(space.widthFt, space.depthFt);
 }
 
-export function createLevel(doc: ProjectDoc, activeLevelId: string | null | undefined): LevelMutationResult {
-  const idFactory = createLevelIdFactory(doc.levels);
-  const insertionAnchor = getLevelById(doc, activeLevelId) ?? doc.levels.at(-1);
-  const insertionIndex = insertionAnchor
-    ? doc.levels.findIndex((level) => level.id === insertionAnchor.id) + 1
-    : doc.levels.length;
-  const newLevel: Level = {
-    id: idFactory(),
+export function createLevel(doc: ProjectDoc, activeLevelId: string): LevelMutationResult {
+  const insertAfterId = getValidActiveLevelId(doc, activeLevelId);
+  const insertAfterIndex = Math.max(0, doc.levels.findIndex((level) => level.id === insertAfterId));
+  const insertAfterLevel = doc.levels[insertAfterIndex] ?? doc.levels.at(-1);
+
+  if (!insertAfterLevel) {
+    return {
+      doc,
+      activeLevelId: ""
+    };
+  }
+
+  const nextId = createLevelIdFactory(doc.levels);
+  const heightFt = getPositiveFeetOrFallback(doc.defaultStoryHeightFt, DEFAULT_STORY_HEIGHT_FT);
+  const level: Level = {
+    id: nextId(),
     name: getNextManualLevelName(doc.levels),
-    elevationFt: insertionAnchor ? insertionAnchor.elevationFt + insertionAnchor.heightFt : 0,
-    heightFt: doc.defaultStoryHeightFt
+    elevationFt: insertAfterLevel.elevationFt + heightFt,
+    heightFt
   };
 
   return {
     doc: {
       ...doc,
       levels: [
-        ...doc.levels.slice(0, insertionIndex),
-        newLevel,
-        ...doc.levels.slice(insertionIndex)
+        ...doc.levels.slice(0, insertAfterIndex + 1),
+        level,
+        ...doc.levels.slice(insertAfterIndex + 1)
       ]
     },
-    activeLevelId: newLevel.id
+    activeLevelId: level.id
+  };
+}
+
+export function deleteLevel(doc: ProjectDoc, levelId: string, activeLevelId: string): LevelMutationResult {
+  if (doc.levels.length <= 1) {
+    return {
+      doc,
+      activeLevelId: getValidActiveLevelId(doc, activeLevelId)
+    };
+  }
+
+  const deleteIndex = doc.levels.findIndex((level) => level.id === levelId);
+
+  if (deleteIndex === -1) {
+    return {
+      doc,
+      activeLevelId: getValidActiveLevelId(doc, activeLevelId)
+    };
+  }
+
+  const levels = doc.levels.filter((level) => level.id !== levelId);
+  const nextDoc: ProjectDoc = {
+    ...doc,
+    levels,
+    spaces: doc.spaces.filter((space) => space.levelId !== levelId)
+  };
+  const fallbackLevel = levels[Math.min(deleteIndex, levels.length - 1)] ?? levels[0];
+
+  return {
+    doc: nextDoc,
+    activeLevelId: activeLevelId === levelId
+      ? fallbackLevel.id
+      : getValidActiveLevelId(nextDoc, activeLevelId)
   };
 }
 
 export function renameLevel(doc: ProjectDoc, levelId: string, name: string): ProjectDoc {
+  const trimmedName = name.trim();
+
+  if (!trimmedName) {
+    return doc;
+  }
+
   return {
     ...doc,
     levels: doc.levels.map((level) => (
       level.id === levelId
-        ? { ...level, name }
+        ? { ...level, name: trimmedName }
         : level
     ))
+  };
+}
+
+export function moveLevel(doc: ProjectDoc, levelId: string, direction: "up" | "down"): ProjectDoc {
+  const index = doc.levels.findIndex((level) => level.id === levelId);
+
+  if (index === -1) {
+    return doc;
+  }
+
+  const nextIndex = direction === "up" ? index - 1 : index + 1;
+
+  if (nextIndex < 0 || nextIndex >= doc.levels.length) {
+    return doc;
+  }
+
+  return {
+    ...doc,
+    levels: swapItems(doc.levels, index, nextIndex)
   };
 }
 
@@ -219,100 +320,51 @@ export function setLevelElevation(doc: ProjectDoc, levelId: string, elevationFt:
   };
 }
 
-export function setDefaultStoryHeight(doc: ProjectDoc, defaultStoryHeightFt: number): ProjectDoc {
-  return {
-    ...doc,
-    defaultStoryHeightFt: getPositiveFeetOrFallback(defaultStoryHeightFt, doc.defaultStoryHeightFt)
-  };
-}
-
-export function deleteLevel(
-  doc: ProjectDoc,
-  levelId: string,
-  activeLevelId: string | null | undefined
-): LevelMutationResult {
-  const currentIndex = doc.levels.findIndex((level) => level.id === levelId);
-
-  if (currentIndex === -1 || doc.levels.length <= 1) {
-    return {
-      doc,
-      activeLevelId: getValidActiveLevelId(doc, activeLevelId)
-    };
-  }
-
-  const levels = doc.levels.filter((level) => level.id !== levelId);
-  const spaces = doc.spaces.filter((space) => space.levelId !== levelId);
-  const fallbackIndex = Math.min(currentIndex, levels.length - 1);
-  const nextActiveLevelId = activeLevelId === levelId
-    ? levels[fallbackIndex]?.id ?? levels[0].id
-    : getValidActiveLevelId({ ...doc, levels, spaces }, activeLevelId);
-
-  return {
-    doc: {
-      ...doc,
-      levels,
-      spaces
-    },
-    activeLevelId: nextActiveLevelId
-  };
-}
-
-export function moveLevel(doc: ProjectDoc, levelId: string, direction: "up" | "down"): ProjectDoc {
-  const currentIndex = doc.levels.findIndex((level) => level.id === levelId);
-
-  if (currentIndex === -1) {
-    return doc;
-  }
-
-  const nextIndex = direction === "up" ? currentIndex - 1 : currentIndex + 1;
-
-  if (nextIndex < 0 || nextIndex >= doc.levels.length) {
+export function setDefaultStoryHeight(doc: ProjectDoc, heightFt: number): ProjectDoc {
+  if (!Number.isFinite(heightFt) || heightFt <= 0) {
     return doc;
   }
 
   return {
     ...doc,
-    levels: swapItems(doc.levels, currentIndex, nextIndex)
+    defaultStoryHeightFt: heightFt
   };
 }
 
 export function autoGenerateLevels(doc: ProjectDoc, input: AutoGenerateLevelsInput): LevelMutationResult {
-  const specs = buildGeneratedLevelSpecs(input);
+  const levelsToGenerate = buildGeneratedLevelSpecs(input);
+  const storyHeightFt = levelsToGenerate[0]?.heightFt ?? DEFAULT_STORY_HEIGHT_FT;
+  const existingLevelsByName = new Map<string, Level[]>();
 
-  if (specs.length === 0) {
-    return {
-      doc,
-      activeLevelId: getValidActiveLevelId(doc, doc.levels[0]?.id)
-    };
+  for (const level of doc.levels) {
+    const matchingLevels = existingLevelsByName.get(level.name) ?? [];
+    matchingLevels.push(level);
+    existingLevelsByName.set(level.name, matchingLevels);
   }
 
-  const idFactory = createLevelIdFactory(doc.levels);
-  const reusedLevelIds = new Set<string>();
-  const levels = specs.map((spec) => {
-    const reusableLevel = doc.levels.find((level) => (
-      level.name === spec.name
-      && !reusedLevelIds.has(level.id)
-    ));
-    const nextLevelId = reusableLevel?.id ?? idFactory();
-
-    reusedLevelIds.add(nextLevelId);
+  const nextId = createLevelIdFactory(doc.levels);
+  const levels = levelsToGenerate.map((levelSpec) => {
+    const reusableLevel = existingLevelsByName.get(levelSpec.name)?.shift();
 
     return {
-      id: nextLevelId,
-      ...spec
+      id: reusableLevel?.id ?? nextId(),
+      name: levelSpec.name,
+      elevationFt: levelSpec.elevationFt,
+      heightFt: levelSpec.heightFt
     };
   });
-  const survivingLevelIds = new Set(levels.map((level) => level.id));
-  const activeLevelName = getPreferredGeneratedLevelName(specs);
-  const activeLevelId = levels.find((level) => level.name === activeLevelName)?.id ?? levels[0].id;
+  const keptLevelIds = new Set(levels.map((level) => level.id));
+  const nextDoc: ProjectDoc = {
+    ...doc,
+    defaultStoryHeightFt: storyHeightFt,
+    levels,
+    spaces: doc.spaces.filter((space) => keptLevelIds.has(space.levelId))
+  };
+  const preferredLevelName = getPreferredGeneratedLevelName(levelsToGenerate);
+  const preferredLevel = levels.find((level) => level.name === preferredLevelName) ?? levels[0];
 
   return {
-    doc: {
-      ...doc,
-      defaultStoryHeightFt: getPositiveFeetOrFallback(input.storyHeightFt, doc.defaultStoryHeightFt),
-      levels,
-      spaces: doc.spaces.filter((space) => survivingLevelIds.has(space.levelId))
-    },
-    activeLevelId
+    doc: nextDoc,
+    activeLevelId: preferredLevel.id
   };
 }
