@@ -28,6 +28,7 @@ Combined repo map and document index. This is the first lookup surface for non-b
 - `setup/`: local preview helpers for port `3001`.
 - `tasks/`: feature notes and bug notes.
 - `vercel.json`: root Vercel deploy config for the frontend preview build and SPA rewrites.
+- `setup/ensure-render-wasm.mjs`: web-build helper that rebuilds or reuses `crates/render-wasm/pkg` depending on toolchain availability.
 
 ## Best Folder To Inspect First
 
@@ -70,6 +71,7 @@ Combined repo map and document index. This is the first lookup surface for non-b
 - `supabase/sample-data/spaces/*.json`: space-layout sample `ProjectDoc` fixtures with polygon apartments.
 - `supabase/sample-data/mixed/*.json`: combined level + apartment layout sample `ProjectDoc` fixtures.
 - `vercel.json`: Vercel build/output config and SPA rewrite fallback for preview deployments.
+- `setup/ensure-render-wasm.mjs`: build-time guard for `crates/render-wasm/pkg` used by web dev and production builds.
 
 ## Document Index
 
@@ -100,6 +102,7 @@ Combined repo map and document index. This is the first lookup surface for non-b
 ### Setup Docs
 
 - `setup/README.md`: explain the helper scripts used for local preview and port-3001 control.
+- `setup/ensure-render-wasm.mjs`: rebuild or reuse the generated wasm package before web dev/build commands.
 - `apps/web/.env.example`: list the browser-safe Supabase and local auth env variables for the web app.
 
 ## Discovery Tips

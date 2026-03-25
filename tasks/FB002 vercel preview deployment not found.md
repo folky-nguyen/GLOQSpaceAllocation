@@ -9,6 +9,7 @@ Result:
 - preview deployment no longer relies on implicit Vercel monorepo detection
 - the repo now has an explicit Vercel build command and output directory
 - SPA routes like `/`, `/login`, and `/editor` can be served through the frontend shell instead of failing at the platform edge
+- web builds no longer require `wasm-pack` to exist in the deploy environment when `crates/render-wasm/pkg` is already present
 
 ## Goal
 
@@ -36,6 +37,17 @@ The routing gap was the real product issue:
 - auth redirects and direct deep links expected `/editor` to load the SPA shell first
 - Vercel resolves URLs before React runs, so missing platform config produced a 404 before the app could boot
 
+Follow-up deploy failure after that first fix:
+
+- Vercel started the correct frontend build
+- `apps/web` still ran a `prebuild` step that called `pnpm build:wasm`
+- that script requires the `wasm-pack` binary
+- the Vercel build image did not provide `wasm-pack`
+
+That made the next immediate outage cause:
+
+- the deployment depended on a local Rust-to-wasm packaging tool that was not available in the hosting environment
+
 ## What Shipped
 
 ### 1. Explicit Vercel deploy config
@@ -60,6 +72,32 @@ Why:
 
 - Vercel treats incoming URLs as platform-level paths first
 - the web app needs `index.html` to load before React Router can resolve `/login`, `/editor`, or any future client-side path
+
+### 3. Checked-in wasm package fallback for deploy builds
+
+`apps/web/package.json`
+
+- changed `predev`, `predev:3001`, and `prebuild` to call `node ../../setup/ensure-render-wasm.mjs`
+
+`setup/ensure-render-wasm.mjs`
+
+- rebuilds `crates/render-wasm/pkg` when `wasm-pack` is available
+- reuses the checked-in wasm package when `wasm-pack` is missing but the generated artifacts already exist
+- fails with one explicit remediation message when neither condition is true
+
+`.gitignore`
+
+- stopped ignoring `crates/render-wasm/pkg/`
+
+`crates/render-wasm/pkg/.gitignore`
+
+- removed the blanket ignore rule so the generated wasm package can be committed
+
+Why:
+
+- local development should still rebuild the wasm package when the toolchain is present
+- Vercel only needs the generated package files to build and serve the frontend
+- this keeps the deploy path deterministic instead of assuming Rust packaging tools exist in every build environment
 
 ## Prevention Flow
 
@@ -91,19 +129,22 @@ Observed results:
 - the web package production build passed locally
 - the emitted frontend output was present in `apps/web/dist`
 - the repo now contains explicit Vercel routing and output config in `vercel.json`
+- the web package now has a deploy-safe wasm bootstrap path through `setup/ensure-render-wasm.mjs`
 
 ## Done Criteria Check
 
 1. the deploy note identifies why Vercel returned `NOT_FOUND`: done
 2. the smallest repo-level Vercel fix is documented: done
 3. the SPA routing requirement is documented for future deploys: done
+4. the missing-`wasm-pack` deploy failure and fallback path are documented: done
 
-## Kinh Nghiem
+## Learnings
 
-- Nếu preview URL hiện trang Vercel `404: NOT_FOUND`, hãy coi đó là lỗi cấu hình deploy hoặc routing ở platform trước, không phải lỗi React render.
-- Trong monorepo, chỉ "build ra được ở đâu đó" là chưa đủ. Vercel phải biết chính xác workspace nào cần build và thư mục output nào cần serve.
-- Khi app dùng `BrowserRouter`, server hoặc hosting platform phải trả các route app về `index.html`. Nếu thiếu fallback này, truy cập thẳng hoặc refresh tại `/editor` hay `/login` sẽ hỏng trước khi React kịp chạy.
-- URL redirect của auth thực chất cũng là một bài test routing. Nếu Supabase trả browser về `/editor`, path đó phải hoạt động như một entry point ở mức platform, không chỉ là route điều hướng nội bộ sau khi app đã load.
-- Đường chẩn đoán ngắn nhất cho nhóm lỗi này là: xác định 404 có phải do Vercel sinh ra không, rồi kiểm tra lần lượt root directory, build command, output directory, và SPA rewrites.
-- Các default ngầm của hosting khá mong manh trong monorepo nhỏ. Chúng có thể chạy tạm cho đến khi cấu trúc thư mục hoặc project settings lệch đi. Cấu hình deploy explicit rẻ hơn nhiều so với việc triage lặp lại.
-- Vite dev server ở local dễ che giấu nhóm lỗi này vì nó đã xử lý SPA fallback sẵn. Production hosting có ranh giới trách nhiệm khác và cần được cấu hình riêng.
+- If a preview URL shows Vercel `404: NOT_FOUND`, treat it as a deployment or platform-routing problem first, not a React rendering bug.
+- In a monorepo, it is not enough that the app builds "somewhere". Vercel must know exactly which workspace to build and which output folder to serve.
+- When the app uses `BrowserRouter`, the server or hosting platform must route app paths back to `index.html`. Without that fallback, direct visits or refreshes on `/editor` and `/login` will fail before React starts.
+- Auth redirect URLs are routing tests in disguise. If Supabase sends the browser to `/editor`, that path must work as a platform entry point, not only as an in-app navigation target after the app has already loaded.
+- The shortest diagnosis path for this class of issue is: confirm whether the 404 is platform-generated, then check root directory, build command, output directory, and SPA rewrites in that order.
+- Implicit hosting defaults are fragile in small monorepos. They often appear to work until folder layout or project settings drift. Explicit deploy configuration is cheaper than repeated triage.
+- A local Vite dev server can hide this class of problem because it already behaves like an SPA server. Production hosting has a different responsibility boundary and must be configured separately.
+- If a web build imports generated wasm artifacts directly, the deploy path must either commit those artifacts or provision the exact packaging toolchain that regenerates them.

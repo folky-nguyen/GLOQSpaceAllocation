@@ -1,0 +1,2 @@
+# Keep the generated wasm package checked into the repo so web builds can
+# consume it in environments where wasm-pack is unavailable.

@@ -4,3 +4,4 @@
 - `up-web-3001.mjs`: starts the local web server on port `3001`, waits for `/editor` to respond, and writes a pid/log file for later shutdown.
 - `down-web-3001.mjs`: stops the background web server started by `up-web-3001.mjs`.
 - `web-3001-runtime.mjs`: shared runtime helpers for health checks, port-owner lookup, and start/stop cleanup on port `3001`.
+- `ensure-render-wasm.mjs`: rebuilds `crates/render-wasm/pkg` when `wasm-pack` is available, or reuses the checked-in package when a deploy environment only needs the existing artifacts.
