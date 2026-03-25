@@ -57,9 +57,11 @@ Those matter for Supabase redirect URL setup.
   - alternate flow on `3001` through the existing workspace scripts
 - `apps/web/src/App.tsx` currently contains the full editor shell, so auth routing should be layered around that shell rather than woven into `ui-store.ts`.
 - `apps/web/src/ui-store.ts` is already reserved for editor chrome state only.
+- `apps/web/src/ui-store.ts` is module-scoped Zustand state, so it will survive route changes and sign-out unless the app resets it explicitly.
 - The repo does not currently expose any Supabase browser config in source control, so auth setup must come from local env only.
 - `supabase/config.toml` currently does not provide browser runtime keys, so the web app must not try to infer them from local Supabase config files.
 - Because the app is already running in React Strict Mode, auth bootstrap and auth subscription setup must be idempotent.
+- OTP completion cannot assume the user stays on the same `/login` page instance after requesting the email. Refresh, new-tab open, or coming back from the inbox are realistic flows.
 
 ## Scope
 
@@ -203,6 +205,11 @@ Minimal login UI shape:
 - optional OTP input + `Verify code` button
 - one compact error message region
 
+Important behavior:
+
+- OTP verification must still work when `pendingEmail` in memory is empty
+- the form must allow verification from the typed email after a refresh or a new tab
+
 Reason:
 
 - a single screen covers both Supabase email configurations
@@ -251,6 +258,10 @@ UI content can stay small:
 
 - current user email
 - `Log out` button
+
+Behavior requirement:
+
+- logout must also reset editor session UI state so the next signed-in user does not inherit the prior session's active tool/view/selection
 
 Do not add:
 
@@ -378,8 +389,10 @@ Do not restyle the editor shell broadly.
 - Never expose `service_role` in any browser-facing file. If a value is accessible through `import.meta.env`, treat it as public.
 - Compute `emailRedirectTo` from `window.location.origin` and append `/editor`. This avoids hardcoding separate redirect URLs for `5173` and `3001`.
 - Use one login screen for both magic link and OTP. Splitting them into separate routes adds state and edge cases without helping the MVP.
+- Do not couple OTP verification availability to in-memory `pendingEmail` alone. Users must still be able to paste a code after a refresh or from a different tab by re-entering their email.
 - Gate `/editor` at the router boundary, not deep inside the editor shell. This keeps auth concerns from leaking into the editor module.
 - Keep auth state out of Zustand. The existing Zustand store is scoped to editor interaction state, and mixing auth into it would blur responsibilities.
+- Reset the editor UI store on logout. Module-scoped Zustand state otherwise leaks view/tool/selection across auth sessions in the same browser process.
 - Guard `bootstrapAuth()` against duplicate execution. React Strict Mode can otherwise create duplicate `onAuthStateChange` subscriptions during development.
 - When env is missing or invalid, fail loudly with a visible UI error state. Silent fallback behavior will look like a broken redirect loop.
 - After changing allowed dev ports or local hostnames, update the Supabase redirect allow list immediately or passwordless auth will appear flaky.
@@ -430,11 +443,13 @@ corepack pnpm --filter web build
 6. Complete auth by either:
    - clicking the magic link, or
    - entering the OTP code
-7. Confirm the app lands on `/editor`
-8. Refresh the page and confirm the session is restored
-9. Hit `Log out`
-10. Confirm the app returns to `/login`
-11. Visit `/editor` while signed out and confirm redirect protection still works
+7. Refresh `/login` after the email is sent, then verify that OTP can still be submitted by re-entering the email if needed
+8. Confirm the app lands on `/editor`
+9. Refresh the page and confirm the session is restored
+10. Change the active tool/view/selection, then hit `Log out`
+11. Confirm the app returns to `/login`
+12. Sign in again and confirm editor UI state resets to its default session values
+13. Visit `/editor` while signed out and confirm redirect protection still works
 
 ## Done Criteria
 

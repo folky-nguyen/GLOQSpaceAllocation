@@ -29,6 +29,14 @@ impl ApiError {
             message: message.into(),
         }
     }
+
+    pub fn unauthorized(message: impl Into<Cow<'static, str>>) -> Self {
+        Self {
+            status: StatusCode::UNAUTHORIZED,
+            code: "unauthorized",
+            message: message.into(),
+        }
+    }
 }
 
 impl IntoResponse for ApiError {

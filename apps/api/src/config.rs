@@ -5,6 +5,7 @@ pub struct AppConfig {
     pub host: String,
     pub port: u16,
     pub database_url: String,
+    pub supabase_url: String,
 }
 
 impl AppConfig {
@@ -20,12 +21,23 @@ impl AppConfig {
             }
         };
         let database_url = read_required_env("DATABASE_URL")?;
+        let supabase_url = read_required_env("SUPABASE_URL")?;
+        let supabase_url = supabase_url.trim_end_matches('/').to_owned();
 
         Ok(Self {
             host,
             port,
             database_url,
+            supabase_url,
         })
+    }
+
+    pub fn supabase_issuer(&self) -> String {
+        format!("{}/auth/v1", self.supabase_url)
+    }
+
+    pub fn supabase_jwks_url(&self) -> String {
+        format!("{}/auth/v1/.well-known/jwks.json", self.supabase_url)
     }
 }
 
