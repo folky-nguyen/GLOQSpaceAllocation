@@ -27,6 +27,7 @@ Combined repo map and document index. This is the first lookup surface for non-b
 - `supabase/`: local Supabase config, SQL migrations, and checked-in sample editor data.
 - `setup/`: local preview helpers for port `3001`.
 - `tasks/`: feature notes and bug notes.
+- `vercel.json`: root Vercel deploy config for the frontend preview build and SPA rewrites.
 
 ## Best Folder To Inspect First
 
@@ -68,6 +69,7 @@ Combined repo map and document index. This is the first lookup surface for non-b
 - `supabase/sample-data/levels/*.json`: level-focused sample `ProjectDoc` fixtures.
 - `supabase/sample-data/spaces/*.json`: space-layout sample `ProjectDoc` fixtures with polygon apartments.
 - `supabase/sample-data/mixed/*.json`: combined level + apartment layout sample `ProjectDoc` fixtures.
+- `vercel.json`: Vercel build/output config and SPA rewrite fallback for preview deployments.
 
 ## Document Index
 
@@ -93,6 +95,7 @@ Combined repo map and document index. This is the first lookup surface for non-b
 ### Bug Notes
 
 - `FB001 editor unreachable on port 3001.md`: diagnose and stabilize the local preview flow when port `3001` is occupied.
+- `FB002 vercel preview deployment not found.md`: document the Vercel `NOT_FOUND` preview failure and the explicit monorepo + SPA routing fix.
 
 ### Setup Docs
 
