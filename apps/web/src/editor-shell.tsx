@@ -5,19 +5,26 @@ import {
   createLevel,
   createStarterProjectDoc,
   deleteLevel,
+  deriveSitePlanFootprint,
   getLevelById,
   getLevelSpaces,
+  getPolygonBoundsFt,
+  getProjectSitePlan,
+  getSitePlanEdges,
   getSpaceAreaSqFt,
   getSpaceBoundsFt,
   getSpaceLabelPointFt,
   getValidActiveLevelId,
   moveLevel,
   renameLevel,
+  setSiteEdgeSetback,
   setDefaultStoryHeight,
   setLevelElevation,
   type AutoGenerateLevelsInput,
   type Level,
+  type Point2Ft,
   type ProjectDoc,
+  type SiteEdge,
   type Space
 } from "./project-doc";
 import { formatFeetAndInches, parseFeetAndInches } from "./units";
@@ -31,12 +38,11 @@ import {
 } from "./ui-store";
 import TestDashboard from "./test-dashboard";
 import {
-  LEVEL_CASES,
   MIXED_CASES,
-  SPACE_CASES,
   cloneSampleProjectDoc,
   type SampleCaseManifest
 } from "./test-cases";
+import type { ThreeDVisibilityMode } from "./space-scene";
 import ThreeDViewport from "./three-d-viewport";
 import UnitsInspector from "./units-inspector";
 
@@ -98,7 +104,14 @@ type LevelManagerProps = {
 };
 
 function getViewSelection(view: ViewMode): Selection {
-  return { kind: "view", id: view === "3d" ? "view-3d" : "view-plan" };
+  return {
+    kind: "view",
+    id: view === "3d"
+      ? "view-3d"
+      : view === "site-plan"
+        ? "view-site-plan"
+        : "view-plan"
+  };
 }
 
 function getSelectModeLabel(mode: SelectMode): string {
@@ -109,13 +122,27 @@ function getSelectModeHint(mode: SelectMode): string {
   return selectModeItems.find((item) => item.value === mode)?.hint ?? selectModeItems[0].hint;
 }
 
-function getViewLabel(view: ViewMode, level: Level): string {
-  return view === "3d" ? "3D View" : `${level.name} Floor Plan`;
+function getThreeDVisibilityModeLabel(mode: ThreeDVisibilityMode): string {
+  return mode === "all-levels" ? "All Levels" : "Active Floor Only";
+}
+
+function getViewLabel(view: ViewMode, level: Level, sitePlanLevel: Level | null): string {
+  if (view === "3d") {
+    return "3D View";
+  }
+
+  if (view === "site-plan") {
+    return sitePlanLevel ? `${sitePlanLevel.name} Site Plan` : "Site Plan";
+  }
+
+  return `${level.name} Floor Plan`;
 }
 
 function getSelectionLabel(
   selection: Selection,
   activeLevel: Level,
+  sitePlanLevel: Level | null,
+  selectedSiteEdge: SiteEdge | null,
   selectedLevel: Level | null,
   selectedSpaces: Space[],
   view: ViewMode
@@ -136,21 +163,31 @@ function getSelectionLabel(
     return selectedLevel.name;
   }
 
-  return getViewLabel(view, activeLevel);
+  if (selection.kind === "site-edge" && selectedSiteEdge) {
+    return `Site Edge ${selectedSiteEdge.index + 1}`;
+  }
+
+  return getViewLabel(view, activeLevel, sitePlanLevel);
 }
 
-function getPlanBounds(spaces: Space[]): PlanBounds {
-  if (spaces.length === 0) {
+function getPlanBounds(polygons: Point2Ft[][]): PlanBounds {
+  const validPolygons = polygons.filter((polygon) => polygon.length > 0);
+
+  if (validPolygons.length === 0) {
     return { minX: 0, minY: 0, width: 0, height: 0 };
   }
 
-  const bounds = spaces.reduce(
-    (currentBounds, space) => ({
-      minX: Math.min(currentBounds.minX, getSpaceBoundsFt(space).minXFt),
-      minY: Math.min(currentBounds.minY, getSpaceBoundsFt(space).minYFt),
-      maxX: Math.max(currentBounds.maxX, getSpaceBoundsFt(space).maxXFt),
-      maxY: Math.max(currentBounds.maxY, getSpaceBoundsFt(space).maxYFt)
-    }),
+  const bounds = validPolygons.reduce(
+    (currentBounds, polygon) => {
+      const polygonBounds = getPolygonBoundsFt(polygon);
+
+      return {
+        minX: Math.min(currentBounds.minX, polygonBounds.minXFt),
+        minY: Math.min(currentBounds.minY, polygonBounds.minYFt),
+        maxX: Math.max(currentBounds.maxX, polygonBounds.maxXFt),
+        maxY: Math.max(currentBounds.maxY, polygonBounds.maxYFt)
+      };
+    },
     {
       minX: Number.POSITIVE_INFINITY,
       minY: Number.POSITIVE_INFINITY,
@@ -170,18 +207,35 @@ function getPlanBounds(spaces: Space[]): PlanBounds {
   };
 }
 
-function getPlanPolygonPoints(space: Space, bounds: PlanBounds): string {
-  return space.footprint
-    .map((point) => `${(point.xFt - bounds.minX) * planScalePx},${(point.yFt - bounds.minY) * planScalePx}`)
+function getPlanPoint(point: Point2Ft, bounds: PlanBounds): { x: number; y: number } {
+  return {
+    x: (point.xFt - bounds.minX) * planScalePx,
+    y: (point.yFt - bounds.minY) * planScalePx
+  };
+}
+
+function getPlanPolygonPoints(footprint: Point2Ft[], bounds: PlanBounds): string {
+  return footprint
+    .map((point) => {
+      const planPoint = getPlanPoint(point, bounds);
+      return `${planPoint.x},${planPoint.y}`;
+    })
     .join(" ");
 }
 
 function getPlanLabelPosition(space: Space, bounds: PlanBounds): { x: number; y: number } {
-  const labelPoint = getSpaceLabelPointFt(space);
+  return getPlanPoint(getSpaceLabelPointFt(space), bounds);
+}
+
+function getPlanEdgeLine(edge: SiteEdge, bounds: PlanBounds) {
+  const start = getPlanPoint(edge.start, bounds);
+  const end = getPlanPoint(edge.end, bounds);
 
   return {
-    x: (labelPoint.xFt - bounds.minX) * planScalePx,
-    y: (labelPoint.yFt - bounds.minY) * planScalePx
+    x1: start.x,
+    y1: start.y,
+    x2: end.x,
+    y2: end.y
   };
 }
 
@@ -553,6 +607,7 @@ export default function EditorShell() {
   const setSelectMode = useUiStore((state) => state.setSelectMode);
   const setActiveView = useUiStore((state) => state.setActiveView);
   const setSelection = useUiStore((state) => state.setSelection);
+  const resetSessionUi = useUiStore((state) => state.resetSessionUi);
   const [editorState, setEditorState] = useState<EditorState>(() => {
     const project = createStarterProjectDoc();
 
@@ -566,11 +621,20 @@ export default function EditorShell() {
   const [activeSampleCaseId, setActiveSampleCaseId] = useState<string | null>(null);
   const [showSelectMenu, setShowSelectMenu] = useState(false);
   const [sweepDraft, setSweepDraft] = useState<SweepSelectionDraft | null>(null);
+  const [threeDVisibilityMode, setThreeDVisibilityMode] = useState<ThreeDVisibilityMode>("active-floor-only");
+  const [siteSetbackInput, setSiteSetbackInput] = useState("");
+  const [siteSetbackError, setSiteSetbackError] = useState<string | null>(null);
   const selectMenuRef = useRef<HTMLDivElement | null>(null);
   const workspaceRef = useRef<HTMLElement | null>(null);
   const project = editorState.project;
   const activeLevelId = getValidActiveLevelId(project, editorState.activeLevelId);
   const activeLevel = getLevelById(project, activeLevelId) ?? project.levels[0];
+  const sitePlan = getProjectSitePlan(project);
+  const sitePlanLevel = sitePlan ? getLevelById(project, sitePlan.levelId) : null;
+  const sitePlanEdges = getSitePlanEdges(sitePlan);
+  const siteFootprintResult = deriveSitePlanFootprint(sitePlan);
+  const siteFootprint = siteFootprintResult.footprint;
+  const sitePlanSpaces = sitePlanLevel ? getLevelSpaces(project, sitePlanLevel.id) : [];
   const selectedSpaceIds = getSelectionSpaceIds(selection);
   const selectedSpaces = selectedSpaceIds.flatMap((spaceId) => {
     const space = project.spaces.find((candidate) => candidate.id === spaceId);
@@ -578,16 +642,27 @@ export default function EditorShell() {
   });
   const selectedSpace = selection?.kind === "space" ? selectedSpaces[0] ?? null : null;
   const selectedLevel = selection?.kind === "level" ? getLevelById(project, selection.id) : null;
+  const selectedSiteEdge = selection?.kind === "site-edge"
+    ? sitePlanEdges[selection.edgeIndex] ?? null
+    : null;
   const activeSpaces = activeLevel ? getLevelSpaces(project, activeLevel.id) : [];
+  const browserSpaces = activeView === "site-plan" ? sitePlanSpaces : activeSpaces;
   const grossArea = project.spaces.reduce((total, space) => total + getSpaceAreaSqFt(space), 0);
-  const currentViewLabel = activeLevel ? getViewLabel(activeView, activeLevel) : "3D View";
+  const currentViewLabel = activeLevel ? getViewLabel(activeView, activeLevel, sitePlanLevel) : "3D View";
   const selectionLabel = activeLevel
-    ? getSelectionLabel(selection, activeLevel, selectedLevel, selectedSpaces, activeView)
+    ? getSelectionLabel(selection, activeLevel, sitePlanLevel, selectedSiteEdge, selectedLevel, selectedSpaces, activeView)
     : "None";
   const userEmail = auth.user?.email ?? "Signed in";
-  const planBounds = getPlanBounds(activeSpaces);
-  const planWidth = planBounds.width * planScalePx;
-  const planHeight = planBounds.height * planScalePx;
+  const floorPlanBounds = getPlanBounds(activeSpaces.map((space) => space.footprint));
+  const floorPlanWidth = floorPlanBounds.width * planScalePx;
+  const floorPlanHeight = floorPlanBounds.height * planScalePx;
+  const sitePlanBounds = getPlanBounds([
+    ...(sitePlan ? [sitePlan.boundary] : []),
+    ...(siteFootprint ? [siteFootprint] : []),
+    ...sitePlanSpaces.map((space) => space.footprint)
+  ]);
+  const sitePlanWidth = sitePlanBounds.width * planScalePx;
+  const sitePlanHeight = sitePlanBounds.height * planScalePx;
   const sweepSelectionBounds = sweepDraft ? getSweepSelectionBounds(sweepDraft) : null;
   const selectionAreaSqFt = selectedSpaces.reduce((total, space) => total + getSpaceAreaSqFt(space), 0);
   const selectedSpaceBounds = selectedSpace ? getSpaceBoundsFt(selectedSpace) : null;
@@ -618,7 +693,26 @@ export default function EditorShell() {
   }, []);
 
   useEffect(() => {
+    if (!selectedSiteEdge) {
+      setSiteSetbackInput("");
+      setSiteSetbackError(null);
+      return;
+    }
+
+    setSiteSetbackInput(formatFeetAndInches(selectedSiteEdge.setbackFt));
+    setSiteSetbackError(null);
+  }, [selectedSiteEdge?.index, selectedSiteEdge?.setbackFt]);
+
+  useEffect(() => {
     if (!selection || !activeLevel) {
+      return;
+    }
+
+    if (selection.kind === "site-edge") {
+      if (activeView !== "site-plan" || !selectedSiteEdge) {
+        setSelection(getViewSelection(activeView));
+      }
+
       return;
     }
 
@@ -647,7 +741,7 @@ export default function EditorShell() {
         setSelection(normalizeSpaceSelection(visibleSpaceIds, getViewSelection(activeView)));
       }
     }
-  }, [activeLevel, activeView, project, selection, setSelection]);
+  }, [activeLevel, activeView, project, selectedSiteEdge, selection, setSelection]);
 
   if (!activeLevel) {
     return null;
@@ -657,6 +751,7 @@ export default function EditorShell() {
     ["Select mode", getSelectModeLabel(selectMode)],
     ["View", currentViewLabel],
     ["Active level", activeLevel.name],
+    ["Site host", sitePlanLevel?.name ?? "None"],
     ["Default height", formatFeetAndInches(project.defaultStoryHeightFt)],
     ["Units", "Imperial ft-in"]
   ];
@@ -686,15 +781,24 @@ export default function EditorShell() {
           ["Height", formatFeetAndInches(selectedLevel.heightFt)],
           ["Spaces", String(getLevelSpaces(project, selectedLevel.id).length)]
         ]
+      : selection?.kind === "site-edge" && selectedSiteEdge
+        ? [
+            ["Type", "Site Edge"],
+            ["Host level", sitePlanLevel?.name ?? "None"],
+            ["Edge", `${selectedSiteEdge.index + 1} of ${sitePlanEdges.length}`],
+            ["Length", formatFeetAndInches(selectedSiteEdge.lengthFt)],
+            ["Setback", formatFeetAndInches(selectedSiteEdge.setbackFt)]
+          ]
       : selection?.kind === "view"
         ? [
             ["Type", "View"],
             ["Name", currentViewLabel],
-            ["Mode", activeView === "3d" ? "Perspective" : "Plan"],
+            ["Mode", activeView === "3d" ? "Perspective" : activeView === "site-plan" ? "Site Plan" : "Plan"],
             ["Select mode", getSelectModeLabel(selectMode)]
           ]
         : [["Selection", "No selection"]];
-  const viewItems: Array<{ id: "view-3d" | "view-plan"; label: string; view: ViewMode }> = [
+  const viewItems: Array<{ id: "view-site-plan" | "view-3d" | "view-plan"; label: string; view: ViewMode }> = [
+    { id: "view-site-plan", label: sitePlanLevel ? `${sitePlanLevel.name} Site Plan` : "Site Plan", view: "site-plan" },
     { id: "view-3d", label: "3D View", view: "3d" },
     { id: "view-plan", label: `${activeLevel.name} Floor Plan`, view: "plan" }
   ];
@@ -726,16 +830,48 @@ export default function EditorShell() {
   };
 
   const handleBrowserSpaceSelection = (spaceId: string) => {
+    const fallbackSelection = getViewSelection(activeView === "3d" ? "3d" : "plan");
+
     if (activeView !== "3d") {
       setActiveView("plan");
     }
 
     if (selectMode === "pick-many") {
-      setSelection(toggleSpaceSelection(selection, spaceId, getViewSelection(activeView)));
+      setSelection(toggleSpaceSelection(selection, spaceId, fallbackSelection));
       return;
     }
 
     setSelection({ kind: "space", id: spaceId });
+  };
+
+  const handleSiteEdgeSelection = (edgeIndex: number) => {
+    setActiveView("site-plan");
+    setSelection({ kind: "site-edge", edgeIndex });
+    setSiteSetbackError(null);
+  };
+
+  const handleSiteSetbackCommit = (input: string) => {
+    if (!selectedSiteEdge) {
+      return;
+    }
+
+    const parsedSetback = parseFeetAndInches(input);
+
+    if (parsedSetback === null || parsedSetback < 0) {
+      setSiteSetbackInput(formatFeetAndInches(selectedSiteEdge.setbackFt));
+      setSiteSetbackError("Setback must be 0 or greater.");
+      return;
+    }
+
+    const formattedSetback = formatFeetAndInches(parsedSetback);
+
+    setEditorState((current) => ({
+      ...current,
+      project: setSiteEdgeSetback(current.project, selectedSiteEdge.index, parsedSetback)
+    }));
+    setSiteSetbackInput(formattedSetback);
+    setSiteSetbackError(null);
+    setActiveSampleCaseId(null);
   };
 
   const handlePlanCanvasPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -789,7 +925,7 @@ export default function EditorShell() {
       currentX: event.clientX - bounds.left,
       currentY: event.clientY - bounds.top
     };
-    const sweptSpaceIds = getSweptSpaceIds(activeSpaces, planBounds, getSweepSelectionBounds(completedDraft));
+    const sweptSpaceIds = getSweptSpaceIds(activeSpaces, floorPlanBounds, getSweepSelectionBounds(completedDraft));
 
     setActiveView("plan");
     setSelection(mergeSpaceSelection(selection, sweptSpaceIds, completedDraft.mode, getViewSelection("plan")));
@@ -896,12 +1032,14 @@ export default function EditorShell() {
       project: projectDoc,
       activeLevelId: nextActiveLevelId
     });
+    setThreeDVisibilityMode("active-floor-only");
     setActiveView(sampleCase.preferredView);
     setSelection(sampleCase.preferredView === "plan"
       ? { kind: "level", id: nextActiveLevelId }
       : getViewSelection(sampleCase.preferredView));
     setActiveSampleCaseId(sampleCase.id);
     setShowSelectMenu(false);
+    setSiteSetbackError(null);
   };
 
   const handleLogout = async () => {
@@ -912,6 +1050,8 @@ export default function EditorShell() {
 
     if (result.error) {
       setLogoutError("Sign-out failed.");
+    } else {
+      resetSessionUi();
     }
 
     setLogoutPending(false);
@@ -941,6 +1081,14 @@ export default function EditorShell() {
 
           <section className="ribbon-group ribbon-group-view">
             <div className="ribbon-buttons">
+              <button
+                type="button"
+                className={`ribbon-button ${activeView === "site-plan" ? "is-active" : ""}`}
+                aria-pressed={activeView === "site-plan"}
+                onClick={() => showView("site-plan")}
+              >
+                Site
+              </button>
               <button
                 type="button"
                 className={`ribbon-button ${activeView === "3d" ? "is-active" : ""}`}
@@ -1092,6 +1240,35 @@ export default function EditorShell() {
                 ))}
               </dl>
             </section>
+
+            {selectedSiteEdge ? (
+              <section className="property-group">
+                <h3>Setback</h3>
+
+                <label className="site-setback-field">
+                  <span>Selected edge setback</span>
+                  <input
+                    value={siteSetbackInput}
+                    onChange={(event) => setSiteSetbackInput(event.currentTarget.value)}
+                    onBlur={(event) => handleSiteSetbackCommit(event.currentTarget.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+                        handleSiteSetbackCommit(event.currentTarget.value);
+                        event.currentTarget.blur();
+                      }
+                    }}
+                  />
+                </label>
+
+                <p className="site-setback-note">
+                  Edge {selectedSiteEdge.index + 1} on {sitePlanLevel?.name ?? "the site"} updates the derived building footprint.
+                </p>
+
+                {siteSetbackError ? <p className="level-manager-error">{siteSetbackError}</p> : null}
+                {siteFootprintResult.error ? <p className="level-manager-error">{siteFootprintResult.error}</p> : null}
+              </section>
+            ) : null}
           </section>
         </aside>
 
@@ -1118,13 +1295,93 @@ export default function EditorShell() {
                 activeLevelName={activeLevel.name}
                 selection={selection}
                 selectionLabel={selectionLabel}
+                visibilityMode={threeDVisibilityMode}
+                onChangeVisibilityMode={setThreeDVisibilityMode}
               />
+            ) : activeView === "site-plan" ? (
+              <div className="viewport viewport-plan">
+                {sitePlan ? (
+                  <div className="plan-canvas-wrap">
+                    <div
+                      className="plan-canvas"
+                      style={{ width: sitePlanWidth, height: sitePlanHeight }}
+                    >
+                      <svg
+                        className="plan-svg"
+                        width={Math.max(sitePlanWidth, 1)}
+                        height={Math.max(sitePlanHeight, 1)}
+                        viewBox={`0 0 ${Math.max(sitePlanWidth, 1)} ${Math.max(sitePlanHeight, 1)}`}
+                      >
+                        <polygon
+                          className="site-plan-boundary"
+                          points={getPlanPolygonPoints(sitePlan.boundary, sitePlanBounds)}
+                        />
+
+                        {siteFootprint ? (
+                          <polygon
+                            className="site-plan-footprint"
+                            points={getPlanPolygonPoints(siteFootprint, sitePlanBounds)}
+                          />
+                        ) : null}
+
+                        {sitePlanSpaces.map((space) => {
+                          const labelPoint = getPlanLabelPosition(space, sitePlanBounds);
+
+                          return (
+                            <g key={space.id} className="plan-space site-plan-space">
+                              <polygon
+                                className="plan-space-shape"
+                                points={getPlanPolygonPoints(space.footprint, sitePlanBounds)}
+                              />
+                              <text className="plan-space-label" x={labelPoint.x} y={labelPoint.y - 4} textAnchor="middle">
+                                {space.name}
+                              </text>
+                              <text className="plan-space-metrics" x={labelPoint.x} y={labelPoint.y + 10} textAnchor="middle">
+                                {getSpaceAreaSqFt(space)} sf
+                              </text>
+                            </g>
+                          );
+                        })}
+
+                        {sitePlanEdges.map((edge) => {
+                          const line = getPlanEdgeLine(edge, sitePlanBounds);
+                          const isActive = selectedSiteEdge?.index === edge.index;
+
+                          return (
+                            <g key={`site-edge-${edge.index}`} className={`site-plan-edge ${isActive ? "is-active" : ""}`}>
+                              <line
+                                className="site-plan-edge-hit"
+                                {...line}
+                                onClick={() => handleSiteEdgeSelection(edge.index)}
+                              />
+                              <line
+                                className="site-plan-edge-stroke"
+                                {...line}
+                              />
+                            </g>
+                          );
+                        })}
+                      </svg>
+
+                      {siteFootprintResult.error ? (
+                        <div className="site-plan-banner">
+                          {siteFootprintResult.error}
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="plan-empty-state">
+                    Load one of the mixed cases to open a site polygon with editable setbacks.
+                  </div>
+                )}
+              </div>
             ) : (
               <div className="viewport viewport-plan">
                 <div className="plan-canvas-wrap">
                   <div
                     className={`plan-canvas ${selectMode === "sweep" ? "is-sweep-mode" : ""}`}
-                    style={{ width: planWidth, height: planHeight }}
+                    style={{ width: floorPlanWidth, height: floorPlanHeight }}
                     onPointerDown={handlePlanCanvasPointerDown}
                     onPointerMove={handlePlanCanvasPointerMove}
                     onPointerUp={handlePlanCanvasPointerEnd}
@@ -1132,12 +1389,12 @@ export default function EditorShell() {
                   >
                     <svg
                       className="plan-svg"
-                      width={Math.max(planWidth, 1)}
-                      height={Math.max(planHeight, 1)}
-                      viewBox={`0 0 ${Math.max(planWidth, 1)} ${Math.max(planHeight, 1)}`}
+                      width={Math.max(floorPlanWidth, 1)}
+                      height={Math.max(floorPlanHeight, 1)}
+                      viewBox={`0 0 ${Math.max(floorPlanWidth, 1)} ${Math.max(floorPlanHeight, 1)}`}
                     >
                       {activeSpaces.map((space) => {
-                        const labelPoint = getPlanLabelPosition(space, planBounds);
+                        const labelPoint = getPlanLabelPosition(space, floorPlanBounds);
 
                         return (
                           <g
@@ -1162,7 +1419,7 @@ export default function EditorShell() {
                           >
                             <polygon
                               className="plan-space-shape"
-                              points={getPlanPolygonPoints(space, planBounds)}
+                              points={getPlanPolygonPoints(space.footprint, floorPlanBounds)}
                             />
                             <text className="plan-space-label" x={labelPoint.x} y={labelPoint.y - 4} textAnchor="middle">
                               {space.name}
@@ -1209,9 +1466,7 @@ export default function EditorShell() {
             {showTestDashboard ? (
               <TestDashboard
                 workspaceRef={workspaceRef}
-                levelCases={LEVEL_CASES}
-                spaceCases={SPACE_CASES}
-                mixedCases={MIXED_CASES}
+                cases={MIXED_CASES}
                 activeCaseId={activeSampleCaseId}
                 onLoadCase={handleLoadSampleCase}
                 onClose={() => setShowTestDashboard(false)}
@@ -1226,7 +1481,7 @@ export default function EditorShell() {
           <section className="project-browser">
             <div className="panel-title-row">
               <h2>Project Browser</h2>
-              <span>{activeLevel.name}</span>
+              <span>{activeView === "site-plan" ? (sitePlanLevel?.name ?? "No Site Plan") : activeLevel.name}</span>
             </div>
 
             <section className="browser-group">
@@ -1236,7 +1491,7 @@ export default function EditorShell() {
                   <button
                     key={viewItem.id}
                     type="button"
-                    className={`browser-row ${selection?.kind === "view" && selection.id === viewItem.id ? "is-active" : ""}`}
+                    className={`browser-row ${activeView === viewItem.view ? "is-active" : ""}`}
                     onClick={() => showView(viewItem.view)}
                   >
                     <span className="browser-row-kind">View</span>
@@ -1266,7 +1521,7 @@ export default function EditorShell() {
             <section className="browser-group">
               <h3>Spaces</h3>
               <div className="browser-list">
-                {activeSpaces.map((space) => (
+                {browserSpaces.map((space) => (
                   <button
                     key={space.id}
                     type="button"
@@ -1286,10 +1541,11 @@ export default function EditorShell() {
       <footer className="status-bar">
         <span>Units: Imperial ft-in</span>
         <span>Active level: {activeLevel.name}</span>
-        <span>Visible spaces: {activeSpaces.length}</span>
+        <span>Plan spaces: {browserSpaces.length}</span>
         <span>View: {currentViewLabel}</span>
+        {activeView === "3d" ? <span>3D scope: {getThreeDVisibilityModeLabel(threeDVisibilityMode)}</span> : null}
         <span>Select: {getSelectModeLabel(selectMode)}</span>
-        <span>Hint: {getSelectModeHint(selectMode)}</span>
+        <span>Hint: {activeView === "site-plan" ? "Click a site edge to edit setback." : getSelectModeHint(selectMode)}</span>
         <span>Case: {activeSampleCaseId ?? "Local"}</span>
         <span>Selection: {selectionLabel}</span>
       </footer>

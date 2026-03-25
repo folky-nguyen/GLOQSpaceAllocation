@@ -22,6 +22,8 @@ pub struct RendererInfo {
 #[serde(rename_all = "camelCase")]
 struct ScenePayload {
     vertices: Vec<Vertex>,
+    #[serde(default)]
+    edge_vertices: Vec<Vertex>,
 }
 
 #[cfg(target_arch = "wasm32")]
@@ -60,11 +62,14 @@ pub struct RendererHandle {
     device: wgpu::Device,
     queue: wgpu::Queue,
     config: wgpu::SurfaceConfiguration,
-    pipeline: wgpu::RenderPipeline,
+    fill_pipeline: wgpu::RenderPipeline,
+    edge_pipeline: wgpu::RenderPipeline,
     camera_buffer: wgpu::Buffer,
     camera_bind_group: wgpu::BindGroup,
-    vertex_buffer: wgpu::Buffer,
-    vertex_count: u32,
+    fill_vertex_buffer: wgpu::Buffer,
+    fill_vertex_count: u32,
+    edge_vertex_buffer: wgpu::Buffer,
+    edge_vertex_count: u32,
     depth_target: DepthTarget,
 }
 
@@ -176,8 +181,69 @@ fn empty_vertex_buffer(device: &wgpu::Device) -> wgpu::Buffer {
 }
 
 #[cfg(target_arch = "wasm32")]
-fn build_scene_vertices(scene: &ScenePayload) -> Vec<Vertex> {
-    scene.vertices.clone()
+fn create_render_pipeline(
+    device: &wgpu::Device,
+    config: &wgpu::SurfaceConfiguration,
+    shader: &wgpu::ShaderModule,
+    pipeline_layout: &wgpu::PipelineLayout,
+    label: &'static str,
+    topology: wgpu::PrimitiveTopology,
+    depth_write_enabled: bool,
+) -> wgpu::RenderPipeline {
+    device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+        label: Some(label),
+        layout: Some(pipeline_layout),
+        vertex: wgpu::VertexState {
+            module: shader,
+            entry_point: Some("vs_main"),
+            compilation_options: wgpu::PipelineCompilationOptions::default(),
+            buffers: &[wgpu::VertexBufferLayout {
+                array_stride: core::mem::size_of::<Vertex>() as u64,
+                step_mode: wgpu::VertexStepMode::Vertex,
+                attributes: &[
+                    wgpu::VertexAttribute {
+                        offset: 0,
+                        shader_location: 0,
+                        format: wgpu::VertexFormat::Float32x3,
+                    },
+                    wgpu::VertexAttribute {
+                        offset: core::mem::size_of::<[f32; 3]>() as u64,
+                        shader_location: 1,
+                        format: wgpu::VertexFormat::Float32x4,
+                    },
+                ],
+            }],
+        },
+        primitive: wgpu::PrimitiveState {
+            topology,
+            strip_index_format: None,
+            front_face: wgpu::FrontFace::Ccw,
+            cull_mode: None,
+            unclipped_depth: false,
+            polygon_mode: wgpu::PolygonMode::Fill,
+            conservative: false,
+        },
+        depth_stencil: Some(wgpu::DepthStencilState {
+            format: wgpu::TextureFormat::Depth24Plus,
+            depth_write_enabled,
+            depth_compare: wgpu::CompareFunction::LessEqual,
+            stencil: wgpu::StencilState::default(),
+            bias: wgpu::DepthBiasState::default(),
+        }),
+        multisample: wgpu::MultisampleState::default(),
+        fragment: Some(wgpu::FragmentState {
+            module: shader,
+            entry_point: Some("fs_main"),
+            compilation_options: wgpu::PipelineCompilationOptions::default(),
+            targets: &[Some(wgpu::ColorTargetState {
+                format: config.format,
+                blend: Some(wgpu::BlendState::REPLACE),
+                write_mask: wgpu::ColorWrites::ALL,
+            })],
+        }),
+        multiview: None,
+        cache: None,
+    })
 }
 
 #[cfg(target_arch = "wasm32")]
@@ -291,73 +357,41 @@ pub async fn create_renderer(canvas: HtmlCanvasElement) -> Result<RendererHandle
         bind_group_layouts: &[&camera_bind_group_layout],
         push_constant_ranges: &[],
     });
-    let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-        label: Some("gloq-space-pipeline"),
-        layout: Some(&pipeline_layout),
-        vertex: wgpu::VertexState {
-            module: &shader,
-            entry_point: Some("vs_main"),
-            compilation_options: wgpu::PipelineCompilationOptions::default(),
-            buffers: &[wgpu::VertexBufferLayout {
-                array_stride: core::mem::size_of::<Vertex>() as u64,
-                step_mode: wgpu::VertexStepMode::Vertex,
-                attributes: &[
-                    wgpu::VertexAttribute {
-                        offset: 0,
-                        shader_location: 0,
-                        format: wgpu::VertexFormat::Float32x3,
-                    },
-                    wgpu::VertexAttribute {
-                        offset: core::mem::size_of::<[f32; 3]>() as u64,
-                        shader_location: 1,
-                        format: wgpu::VertexFormat::Float32x4,
-                    },
-                ],
-            }],
-        },
-        primitive: wgpu::PrimitiveState {
-            topology: wgpu::PrimitiveTopology::TriangleList,
-            strip_index_format: None,
-            front_face: wgpu::FrontFace::Ccw,
-            cull_mode: None,
-            unclipped_depth: false,
-            polygon_mode: wgpu::PolygonMode::Fill,
-            conservative: false,
-        },
-        depth_stencil: Some(wgpu::DepthStencilState {
-            format: wgpu::TextureFormat::Depth24Plus,
-            depth_write_enabled: true,
-            depth_compare: wgpu::CompareFunction::LessEqual,
-            stencil: wgpu::StencilState::default(),
-            bias: wgpu::DepthBiasState::default(),
-        }),
-        multisample: wgpu::MultisampleState::default(),
-        fragment: Some(wgpu::FragmentState {
-            module: &shader,
-            entry_point: Some("fs_main"),
-            compilation_options: wgpu::PipelineCompilationOptions::default(),
-            targets: &[Some(wgpu::ColorTargetState {
-                format: config.format,
-                blend: Some(wgpu::BlendState::REPLACE),
-                write_mask: wgpu::ColorWrites::ALL,
-            })],
-        }),
-        multiview: None,
-        cache: None,
-    });
+    let fill_pipeline = create_render_pipeline(
+        &device,
+        &config,
+        &shader,
+        &pipeline_layout,
+        "gloq-space-fill-pipeline",
+        wgpu::PrimitiveTopology::TriangleList,
+        true,
+    );
+    let edge_pipeline = create_render_pipeline(
+        &device,
+        &config,
+        &shader,
+        &pipeline_layout,
+        "gloq-space-edge-pipeline",
+        wgpu::PrimitiveTopology::LineList,
+        false,
+    );
     let depth_target = create_depth_target(&device, &config);
-    let vertex_buffer = empty_vertex_buffer(&device);
+    let fill_vertex_buffer = empty_vertex_buffer(&device);
+    let edge_vertex_buffer = empty_vertex_buffer(&device);
 
     Ok(RendererHandle {
         surface,
         device,
         queue,
         config,
-        pipeline,
+        fill_pipeline,
+        edge_pipeline,
         camera_buffer,
         camera_bind_group,
-        vertex_buffer,
-        vertex_count: 0,
+        fill_vertex_buffer,
+        fill_vertex_count: 0,
+        edge_vertex_buffer,
+        edge_vertex_count: 0,
         depth_target,
     })
 }
@@ -382,10 +416,11 @@ impl RendererHandle {
 
     pub fn set_scene(&mut self, scene: JsValue) -> Result<(), JsValue> {
         let payload: ScenePayload = parse_js_value(scene)?;
-        let vertices = build_scene_vertices(&payload);
+        let vertices = payload.vertices;
+        let edge_vertices = payload.edge_vertices;
 
-        self.vertex_count = vertices.len() as u32;
-        self.vertex_buffer = if vertices.is_empty() {
+        self.fill_vertex_count = vertices.len() as u32;
+        self.fill_vertex_buffer = if vertices.is_empty() {
             empty_vertex_buffer(&self.device)
         } else {
             self.device.create_buffer(&wgpu::BufferDescriptor {
@@ -398,7 +433,24 @@ impl RendererHandle {
 
         if !vertices.is_empty() {
             self.queue
-                .write_buffer(&self.vertex_buffer, 0, bytes_of_slice(&vertices));
+                .write_buffer(&self.fill_vertex_buffer, 0, bytes_of_slice(&vertices));
+        }
+
+        self.edge_vertex_count = edge_vertices.len() as u32;
+        self.edge_vertex_buffer = if edge_vertices.is_empty() {
+            empty_vertex_buffer(&self.device)
+        } else {
+            self.device.create_buffer(&wgpu::BufferDescriptor {
+                label: Some("gloq-space-edge-vertices"),
+                size: bytes_of_slice(&edge_vertices).len() as u64,
+                usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+                mapped_at_creation: false,
+            })
+        };
+
+        if !edge_vertices.is_empty() {
+            self.queue
+                .write_buffer(&self.edge_vertex_buffer, 0, bytes_of_slice(&edge_vertices));
         }
 
         Ok(())
@@ -467,10 +519,19 @@ impl RendererHandle {
                 timestamp_writes: None,
             });
 
-            pass.set_pipeline(&self.pipeline);
             pass.set_bind_group(0, &self.camera_bind_group, &[]);
-            pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
-            pass.draw(0..self.vertex_count, 0..1);
+
+            if self.fill_vertex_count > 0 {
+                pass.set_pipeline(&self.fill_pipeline);
+                pass.set_vertex_buffer(0, self.fill_vertex_buffer.slice(..));
+                pass.draw(0..self.fill_vertex_count, 0..1);
+            }
+
+            if self.edge_vertex_count > 0 {
+                pass.set_pipeline(&self.edge_pipeline);
+                pass.set_vertex_buffer(0, self.edge_vertex_buffer.slice(..));
+                pass.draw(0..self.edge_vertex_count, 0..1);
+            }
         }
 
         self.queue.submit(Some(encoder.finish()));

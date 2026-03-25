@@ -1,6 +1,8 @@
 export const DEFAULT_STORY_HEIGHT_FT = 10;
+export const DEFAULT_SITE_SETBACK_FT = 5;
 
 const GEOMETRY_EPSILON = 1e-6;
+const HALF_PLANE_EPSILON = 1e-4;
 
 export type Point2Ft = {
   xFt: number;
@@ -30,12 +32,32 @@ export type Space = {
   footprint: Point2Ft[];
 };
 
+export type SitePlan = {
+  levelId: string;
+  boundary: Point2Ft[];
+  edgeSetbacksFt: number[];
+};
+
+export type SiteEdge = {
+  index: number;
+  start: Point2Ft;
+  end: Point2Ft;
+  midpoint: Point2Ft;
+  lengthFt: number;
+  setbackFt: number;
+};
+
+export type DerivedFootprintResult =
+  | { footprint: Point2Ft[]; error: null }
+  | { footprint: null; error: string };
+
 export type ProjectDoc = {
   id: string;
   name: string;
   defaultStoryHeightFt: number;
   levels: Level[];
   spaces: Space[];
+  sitePlan?: SitePlan | null;
 };
 
 export type AutoGenerateLevelsInput = {
@@ -149,6 +171,53 @@ function getPreferredGeneratedLevelName(levels: GeneratedLevelSpec[]): string {
 function pointsMatch(left: Point2Ft, right: Point2Ft): boolean {
   return Math.abs(left.xFt - right.xFt) <= GEOMETRY_EPSILON
     && Math.abs(left.yFt - right.yFt) <= GEOMETRY_EPSILON;
+}
+
+function clampSiteSetbackFt(value: number): number {
+  if (!Number.isFinite(value)) {
+    return DEFAULT_SITE_SETBACK_FT;
+  }
+
+  return Math.max(0, value);
+}
+
+function subtractPoint(left: Point2Ft, right: Point2Ft): Point2Ft {
+  return {
+    xFt: left.xFt - right.xFt,
+    yFt: left.yFt - right.yFt
+  };
+}
+
+function addScaledPoint(point: Point2Ft, direction: Point2Ft, scale: number): Point2Ft {
+  return {
+    xFt: point.xFt + direction.xFt * scale,
+    yFt: point.yFt + direction.yFt * scale
+  };
+}
+
+function dotProduct(left: Point2Ft, right: Point2Ft): number {
+  return left.xFt * right.xFt + left.yFt * right.yFt;
+}
+
+function crossVector(left: Point2Ft, right: Point2Ft): number {
+  return left.xFt * right.yFt - left.yFt * right.xFt;
+}
+
+function intersectLines(
+  firstPoint: Point2Ft,
+  firstDirection: Point2Ft,
+  secondPoint: Point2Ft,
+  secondDirection: Point2Ft
+): Point2Ft | null {
+  const denominator = crossVector(firstDirection, secondDirection);
+
+  if (Math.abs(denominator) <= GEOMETRY_EPSILON) {
+    return null;
+  }
+
+  const delta = subtractPoint(secondPoint, firstPoint);
+  const distance = crossVector(delta, secondDirection) / denominator;
+  return addScaledPoint(firstPoint, firstDirection, distance);
 }
 
 export function createRectangleFootprint(xFt: number, yFt: number, widthFt: number, depthFt: number): Point2Ft[] {
@@ -269,6 +338,184 @@ export function getPolygonCentroidFt(footprint: Point2Ft[]): Point2Ft {
   };
 }
 
+export function createDefaultSiteEdgeSetbacksFt(edgeCount: number): number[] {
+  return Array.from({ length: Math.max(0, edgeCount) }, () => DEFAULT_SITE_SETBACK_FT);
+}
+
+export function repairSitePlanGeometry(sitePlan: SitePlan | null | undefined): SitePlan | null {
+  if (!sitePlan) {
+    return null;
+  }
+
+  const boundary = normalizeFootprint(sitePlan.boundary);
+
+  if (boundary.length < 3) {
+    return null;
+  }
+
+  const fallbackSetbacks = createDefaultSiteEdgeSetbacksFt(boundary.length);
+
+  return {
+    levelId: typeof sitePlan.levelId === "string" ? sitePlan.levelId : "",
+    boundary,
+    edgeSetbacksFt: fallbackSetbacks.map((fallbackValue, index) => {
+      const nextValue = sitePlan.edgeSetbacksFt[index];
+      return Number.isFinite(nextValue) ? Math.max(0, nextValue) : fallbackValue;
+    })
+  };
+}
+
+export function normalizeSitePlan(sitePlan: SitePlan | null | undefined, levels: Level[]): SitePlan | null {
+  const repairedSitePlan = repairSitePlanGeometry(sitePlan);
+
+  if (!repairedSitePlan) {
+    return null;
+  }
+
+  const fallbackLevelId = levels[0]?.id ?? "";
+  const levelId = repairedSitePlan.levelId && levels.some((level) => level.id === repairedSitePlan.levelId)
+    ? repairedSitePlan.levelId
+    : fallbackLevelId;
+
+  if (!levelId) {
+    return null;
+  }
+
+  return {
+    ...repairedSitePlan,
+    levelId
+  };
+}
+
+export function repairProjectDoc(doc: ProjectDoc): ProjectDoc {
+  return {
+    ...doc,
+    sitePlan: normalizeSitePlan(doc.sitePlan, doc.levels)
+  };
+}
+
+export function getProjectSitePlan(doc: ProjectDoc): SitePlan | null {
+  return normalizeSitePlan(doc.sitePlan, doc.levels);
+}
+
+export function getSitePlanEdges(sitePlan: SitePlan | null | undefined): SiteEdge[] {
+  const repairedSitePlan = repairSitePlanGeometry(sitePlan);
+
+  if (!repairedSitePlan) {
+    return [];
+  }
+
+  return repairedSitePlan.boundary.map((start, index) => {
+    const end = repairedSitePlan.boundary[(index + 1) % repairedSitePlan.boundary.length];
+    const direction = subtractPoint(end, start);
+
+    return {
+      index,
+      start,
+      end,
+      midpoint: {
+        xFt: start.xFt + direction.xFt / 2,
+        yFt: start.yFt + direction.yFt / 2
+      },
+      lengthFt: Math.hypot(direction.xFt, direction.yFt),
+      setbackFt: repairedSitePlan.edgeSetbacksFt[index] ?? DEFAULT_SITE_SETBACK_FT
+    };
+  });
+}
+
+export function deriveSitePlanFootprint(sitePlan: SitePlan | null | undefined): DerivedFootprintResult {
+  const repairedSitePlan = repairSitePlanGeometry(sitePlan);
+
+  if (!repairedSitePlan) {
+    return {
+      footprint: null,
+      error: "Site boundary needs at least 3 valid points."
+    };
+  }
+
+  const signedArea = getPolygonSignedAreaSqFt(repairedSitePlan.boundary);
+
+  if (Math.abs(signedArea) <= GEOMETRY_EPSILON) {
+    return {
+      footprint: null,
+      error: "Site boundary must enclose a valid area."
+    };
+  }
+
+  const orientationFactor = signedArea >= 0 ? 1 : -1;
+  const offsetEdges = repairedSitePlan.boundary.map((start, index) => {
+    const end = repairedSitePlan.boundary[(index + 1) % repairedSitePlan.boundary.length];
+    const direction = subtractPoint(end, start);
+    const lengthFt = Math.hypot(direction.xFt, direction.yFt);
+
+    if (lengthFt <= GEOMETRY_EPSILON) {
+      return null;
+    }
+
+    const inwardNormal: Point2Ft = {
+      xFt: orientationFactor * (-direction.yFt / lengthFt),
+      yFt: orientationFactor * (direction.xFt / lengthFt)
+    };
+    const setbackFt = repairedSitePlan.edgeSetbacksFt[index] ?? DEFAULT_SITE_SETBACK_FT;
+
+    return {
+      start,
+      direction,
+      inwardNormal,
+      setbackFt,
+      offsetStart: addScaledPoint(start, inwardNormal, setbackFt)
+    };
+  });
+
+  if (offsetEdges.some((edge) => !edge)) {
+    return {
+      footprint: null,
+      error: "Site boundary has a zero-length edge."
+    };
+  }
+
+  const resolvedEdges = offsetEdges.flatMap((edge) => edge ? [edge] : []);
+  const footprint = resolvedEdges.map((currentEdge, index) => {
+    const previousEdge = resolvedEdges[(index - 1 + resolvedEdges.length) % resolvedEdges.length];
+    return intersectLines(previousEdge.offsetStart, previousEdge.direction, currentEdge.offsetStart, currentEdge.direction);
+  });
+
+  if (footprint.some((point) => !point || !Number.isFinite(point.xFt) || !Number.isFinite(point.yFt))) {
+    return {
+      footprint: null,
+      error: "Setbacks cannot resolve a valid building footprint."
+    };
+  }
+
+  const normalizedFootprint = normalizeFootprint(footprint.flatMap((point) => point ? [point] : []));
+
+  if (normalizedFootprint.length < 3 || getPolygonAreaSqFt(normalizedFootprint) <= GEOMETRY_EPSILON) {
+    return {
+      footprint: null,
+      error: "Setbacks collapse the building footprint."
+    };
+  }
+
+  const isInsideAllInsetHalfPlanes = normalizedFootprint.every((point) => (
+    resolvedEdges.every((edge) => {
+      const insetDistance = dotProduct(subtractPoint(point, edge.start), edge.inwardNormal);
+      return insetDistance >= edge.setbackFt - HALF_PLANE_EPSILON;
+    })
+  ));
+
+  if (!isInsideAllInsetHalfPlanes) {
+    return {
+      footprint: null,
+      error: "Setbacks exceed the available site depth."
+    };
+  }
+
+  return {
+    footprint: normalizedFootprint,
+    error: null
+  };
+}
+
 function crossProduct(origin: Point2Ft, left: Point2Ft, right: Point2Ft): number {
   return (left.xFt - origin.xFt) * (right.yFt - origin.yFt)
     - (left.yFt - origin.yFt) * (right.xFt - origin.xFt);
@@ -359,10 +606,30 @@ export function getSpaceLabelPointFt(space: Space): Point2Ft {
   return getPolygonCentroidFt(space.footprint);
 }
 
+export function setSiteEdgeSetback(doc: ProjectDoc, edgeIndex: number, setbackFt: number): ProjectDoc {
+  const repairedSitePlan = getProjectSitePlan(doc);
+
+  if (!repairedSitePlan || !Number.isInteger(edgeIndex) || edgeIndex < 0 || edgeIndex >= repairedSitePlan.boundary.length) {
+    return repairProjectDoc(doc);
+  }
+
+  const edgeSetbacksFt = repairedSitePlan.edgeSetbacksFt.map((currentSetbackFt, index) => (
+    index === edgeIndex ? clampSiteSetbackFt(setbackFt) : currentSetbackFt
+  ));
+
+  return repairProjectDoc({
+    ...doc,
+    sitePlan: {
+      ...repairedSitePlan,
+      edgeSetbacksFt
+    }
+  });
+}
+
 export function createStarterProjectDoc(): ProjectDoc {
   const levelId = "level-1";
 
-  return {
+  return repairProjectDoc({
     id: "project-starter",
     name: "GLOQ Tower",
     defaultStoryHeightFt: DEFAULT_STORY_HEIGHT_FT,
@@ -412,8 +679,9 @@ export function createStarterProjectDoc(): ProjectDoc {
           { xFt: 2, yFt: 30 }
         ]
       }
-    ]
-  };
+    ],
+    sitePlan: null
+  });
 }
 
 export function getLevelById(doc: ProjectDoc, levelId: string): Level | null {
@@ -458,14 +726,14 @@ export function createLevel(doc: ProjectDoc, activeLevelId: string): LevelMutati
   };
 
   return {
-    doc: {
+    doc: repairProjectDoc({
       ...doc,
       levels: [
         ...doc.levels.slice(0, insertAfterIndex + 1),
         level,
         ...doc.levels.slice(insertAfterIndex + 1)
       ]
-    },
+    }),
     activeLevelId: level.id
   };
 }
@@ -488,11 +756,11 @@ export function deleteLevel(doc: ProjectDoc, levelId: string, activeLevelId: str
   }
 
   const levels = doc.levels.filter((level) => level.id !== levelId);
-  const nextDoc: ProjectDoc = {
+  const nextDoc: ProjectDoc = repairProjectDoc({
     ...doc,
     levels,
     spaces: doc.spaces.filter((space) => space.levelId !== levelId)
-  };
+  });
   const fallbackLevel = levels[Math.min(deleteIndex, levels.length - 1)] ?? levels[0];
 
   return {
@@ -510,14 +778,14 @@ export function renameLevel(doc: ProjectDoc, levelId: string, name: string): Pro
     return doc;
   }
 
-  return {
+  return repairProjectDoc({
     ...doc,
     levels: doc.levels.map((level) => (
       level.id === levelId
         ? { ...level, name: trimmedName }
         : level
     ))
-  };
+  });
 }
 
 export function moveLevel(doc: ProjectDoc, levelId: string, direction: "up" | "down"): ProjectDoc {
@@ -533,10 +801,10 @@ export function moveLevel(doc: ProjectDoc, levelId: string, direction: "up" | "d
     return doc;
   }
 
-  return {
+  return repairProjectDoc({
     ...doc,
     levels: swapItems(doc.levels, index, nextIndex)
-  };
+  });
 }
 
 export function setLevelElevation(doc: ProjectDoc, levelId: string, elevationFt: number): ProjectDoc {
@@ -544,14 +812,14 @@ export function setLevelElevation(doc: ProjectDoc, levelId: string, elevationFt:
     return doc;
   }
 
-  return {
+  return repairProjectDoc({
     ...doc,
     levels: doc.levels.map((level) => (
       level.id === levelId
         ? { ...level, elevationFt }
         : level
     ))
-  };
+  });
 }
 
 export function setDefaultStoryHeight(doc: ProjectDoc, heightFt: number): ProjectDoc {
@@ -559,10 +827,10 @@ export function setDefaultStoryHeight(doc: ProjectDoc, heightFt: number): Projec
     return doc;
   }
 
-  return {
+  return repairProjectDoc({
     ...doc,
     defaultStoryHeightFt: heightFt
-  };
+  });
 }
 
 export function autoGenerateLevels(doc: ProjectDoc, input: AutoGenerateLevelsInput): LevelMutationResult {
@@ -588,12 +856,12 @@ export function autoGenerateLevels(doc: ProjectDoc, input: AutoGenerateLevelsInp
     };
   });
   const keptLevelIds = new Set(levels.map((level) => level.id));
-  const nextDoc: ProjectDoc = {
+  const nextDoc: ProjectDoc = repairProjectDoc({
     ...doc,
     defaultStoryHeightFt: storyHeightFt,
     levels,
     spaces: doc.spaces.filter((space) => keptLevelIds.has(space.levelId))
-  };
+  });
   const preferredLevelName = getPreferredGeneratedLevelName(levelsToGenerate);
   const preferredLevel = levels.find((level) => level.name === preferredLevelName) ?? levels[0];
 

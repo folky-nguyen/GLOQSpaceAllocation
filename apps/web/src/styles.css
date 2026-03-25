@@ -605,6 +605,32 @@ dd {
   background: rgba(255, 255, 255, 0.72);
 }
 
+.site-setback-field {
+  display: grid;
+  gap: 0.3rem;
+  margin-top: 0.2rem;
+}
+
+.site-setback-field span {
+  font-size: 0.71rem;
+  font-weight: 600;
+  color: #4f5f70;
+}
+
+.site-setback-field input {
+  width: 100%;
+  padding: 0.45rem 0.55rem;
+  border: 1px solid #96a4b4;
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.site-setback-note {
+  margin-top: 0.55rem;
+  color: #586878;
+  font-size: 0.71rem;
+  line-height: 1.45;
+}
+
 .level-manager-header,
 .level-manager-title-row,
 .level-manager-header-actions,
@@ -986,7 +1012,52 @@ dd {
 }
 
 .three-d-controls {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
   pointer-events: auto;
+}
+
+.three-d-scope {
+  display: grid;
+  gap: 0.32rem;
+  padding: 0.5rem 0.55rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(7, 17, 29, 0.38);
+  backdrop-filter: blur(8px);
+}
+
+.three-d-scope-label {
+  color: #bfd2e6;
+  font-size: 0.7rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.three-d-scope-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.three-d-scope-button {
+  min-width: 8.75rem;
+  padding: 0.48rem 0.62rem;
+  border: 1px solid rgba(152, 187, 219, 0.35);
+  background: rgba(11, 25, 40, 0.74);
+  color: #d9e8f6;
+  font-size: 0.76rem;
+  cursor: pointer;
+}
+
+.three-d-scope-button:hover {
+  background: rgba(20, 38, 58, 0.86);
+}
+
+.three-d-scope-button.is-active {
+  border-color: rgba(168, 211, 246, 0.72);
+  background: rgba(46, 90, 132, 0.7);
+  color: #ffffff;
 }
 
 .three-d-state {
@@ -1012,6 +1083,11 @@ dd {
 .three-d-state span {
   color: #bfd2e6;
   font-size: 0.79rem;
+}
+
+.three-d-state-action {
+  justify-self: center;
+  margin-top: 0.35rem;
 }
 
 .viewport-stats {
@@ -1075,6 +1151,70 @@ dd {
 
 .plan-canvas.is-sweep-mode {
   cursor: crosshair;
+}
+
+.plan-empty-state {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  padding: 1.2rem;
+  color: #556575;
+  text-align: center;
+}
+
+.site-plan-boundary {
+  fill: rgba(187, 214, 234, 0.18);
+  stroke: #49657f;
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+
+.site-plan-footprint {
+  fill: rgba(154, 188, 126, 0.24);
+  stroke: #68844f;
+  stroke-width: 2;
+  stroke-dasharray: 8 4;
+  vector-effect: non-scaling-stroke;
+}
+
+.site-plan-edge-hit {
+  stroke: rgba(0, 0, 0, 0);
+  stroke-width: 14;
+  vector-effect: non-scaling-stroke;
+  cursor: pointer;
+}
+
+.site-plan-edge-stroke {
+  stroke: #40586d;
+  stroke-width: 2.2;
+  vector-effect: non-scaling-stroke;
+}
+
+.site-plan-edge.is-active .site-plan-edge-stroke {
+  stroke: #c85f2d;
+  stroke-width: 3;
+}
+
+.site-plan-space {
+  pointer-events: none;
+}
+
+.site-plan-space .plan-space-shape {
+  fill: rgba(234, 217, 152, 0.88);
+  stroke: #8f9878;
+}
+
+.site-plan-banner {
+  position: absolute;
+  left: 0.7rem;
+  bottom: 0.7rem;
+  z-index: 2;
+  max-width: min(28rem, calc(100% - 1.4rem));
+  padding: 0.55rem 0.7rem;
+  border: 1px solid rgba(166, 80, 67, 0.65);
+  background: rgba(255, 241, 238, 0.94);
+  color: #8c2d22;
+  font-size: 0.73rem;
 }
 
 .plan-space {
@@ -1221,6 +1361,27 @@ dd {
   color: #556474;
 }
 
+.auth-mode-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  margin-top: 1rem;
+}
+
+.auth-mode-button {
+  min-width: 7.5rem;
+  padding: 0.58rem 0.72rem;
+  border: 1px solid #71879e;
+  background: linear-gradient(180deg, #ffffff 0%, #dce7f2 100%);
+  cursor: pointer;
+}
+
+.auth-mode-button.is-active {
+  border-color: #5b86b5;
+  background: linear-gradient(180deg, #ffffff 0%, #c8dff4 100%);
+  box-shadow: inset 0 0 0 1px rgba(91, 134, 181, 0.24);
+}
+
 .auth-form {
   display: grid;
   gap: 0.75rem;
@@ -1255,7 +1416,8 @@ dd {
 }
 
 .auth-primary,
-.auth-secondary {
+.auth-secondary,
+.auth-mode-button {
   min-width: 9.5rem;
   padding: 0.72rem 0.9rem;
   border: 1px solid #71879e;
@@ -1264,7 +1426,8 @@ dd {
 }
 
 .auth-primary:hover,
-.auth-secondary:hover {
+.auth-secondary:hover,
+.auth-mode-button:hover {
   background: linear-gradient(180deg, #ffffff 0%, #d3e8f7 100%);
 }
 

@@ -2,6 +2,7 @@ import { useSyncExternalStore } from "react";
 import { createClient, type Session, type SupabaseClient, type User } from "@supabase/supabase-js";
 
 export type AuthStatus = "loading" | "signed_out" | "signed_in";
+export type PendingOtpType = "email" | "recovery";
 
 export type AuthSnapshot = {
   status: AuthStatus;
@@ -9,6 +10,8 @@ export type AuthSnapshot = {
   user: User | null;
   error: string | null;
   pendingEmail: string;
+  pendingOtpType: PendingOtpType | null;
+  recoveryReady: boolean;
 };
 
 const listeners = new Set<() => void>();
@@ -18,7 +21,9 @@ let authSnapshot: AuthSnapshot = {
   session: null,
   user: null,
   error: null,
-  pendingEmail: ""
+  pendingEmail: "",
+  pendingOtpType: null,
+  recoveryReady: false
 };
 
 let client: SupabaseClient | null = null;
@@ -59,7 +64,9 @@ function applyLocalDevBypass() {
     session: null,
     user: getLocalDevUser(),
     error: null,
-    pendingEmail: ""
+    pendingEmail: "",
+    pendingOtpType: null,
+    recoveryReady: false
   });
 }
 
@@ -78,12 +85,12 @@ function getErrorMessage(error: { message?: string } | null | undefined, fallbac
   return error?.message?.trim() || fallback;
 }
 
-function getBrowserRedirectUrl(): string | undefined {
+function getBrowserRedirectUrl(path: "/login" | "/editor" = "/login"): string | undefined {
   if (typeof window === "undefined") {
     return undefined;
   }
 
-  return new URL("/editor", window.location.origin).toString();
+  return new URL(path, window.location.origin).toString();
 }
 
 function getSupabaseClient(): { client: SupabaseClient | null; error: string | null } {
@@ -114,14 +121,42 @@ function getSupabaseClient(): { client: SupabaseClient | null; error: string | n
   return { client, error: null };
 }
 
-function applySession(session: Session | null, error: string | null = null) {
-  setSnapshot((current) => ({
-    ...current,
+function applySession(
+  session: Session | null,
+  error: string | null = null,
+  options?: { recoveryReady?: boolean }
+) {
+  setSnapshot({
     status: session ? "signed_in" : "signed_out",
     session,
     user: session?.user ?? null,
     error,
-    pendingEmail: session ? "" : current.pendingEmail
+    pendingEmail: "",
+    pendingOtpType: null,
+    recoveryReady: session ? Boolean(options?.recoveryReady) : false
+  });
+}
+
+function beginPublicAuthAction() {
+  setSnapshot((current) => ({
+    ...current,
+    error: null,
+    pendingEmail: "",
+    pendingOtpType: null,
+    recoveryReady: false
+  }));
+}
+
+function setPendingOtp(email: string, type: PendingOtpType) {
+  setSnapshot((current) => ({
+    ...current,
+    status: "signed_out",
+    session: null,
+    user: null,
+    error: null,
+    pendingEmail: email,
+    pendingOtpType: type,
+    recoveryReady: false
   }));
 }
 
@@ -155,14 +190,19 @@ export async function bootstrapAuth(): Promise<void> {
         status: "signed_out",
         error: clientResult.error,
         session: null,
-        user: null
+        user: null,
+        recoveryReady: false
       }));
       return;
     }
 
     if (!authSubscription) {
-      const { data } = clientResult.client.auth.onAuthStateChange((_event, session) => {
-        applySession(session);
+      const { data } = clientResult.client.auth.onAuthStateChange((event, session) => {
+        const recoveryReady = event === "PASSWORD_RECOVERY"
+          || (session !== null && authSnapshot.pendingOtpType === "recovery")
+          || (session !== null && authSnapshot.recoveryReady);
+
+        applySession(session, null, { recoveryReady });
       });
       authSubscription = data.subscription;
     }
@@ -175,7 +215,8 @@ export async function bootstrapAuth(): Promise<void> {
         status: "signed_out",
         error: getErrorMessage(error, "Unable to restore the current session."),
         session: null,
-        user: null
+        user: null,
+        recoveryReady: false
       }));
       return;
     }
@@ -186,13 +227,14 @@ export async function bootstrapAuth(): Promise<void> {
   return bootstrapPromise;
 }
 
-export async function sendLoginEmail(email: string): Promise<{ error: string | null }> {
+export async function signInWithPassword(email: string, password: string): Promise<{ error: string | null }> {
   if (isLocalDevAuthBypassed()) {
     applyLocalDevBypass();
     return { error: null };
   }
 
   await bootstrapAuth();
+  beginPublicAuthAction();
 
   const clientResult = getSupabaseClient();
 
@@ -205,39 +247,33 @@ export async function sendLoginEmail(email: string): Promise<{ error: string | n
     return { error: clientResult.error };
   }
 
-  const redirectTo = getBrowserRedirectUrl();
-  const { error } = await clientResult.client.auth.signInWithOtp({
-    email,
-    options: redirectTo ? { emailRedirectTo: redirectTo } : undefined
-  });
+  const { data, error } = await clientResult.client.auth.signInWithPassword({ email, password });
 
-  if (error) {
-    const message = getErrorMessage(error, "Unable to send the sign-in email.");
+  if (error || !data.session) {
+    const message = "Unable to sign in with email and password.";
     setSnapshot((current) => ({
       ...current,
       status: "signed_out",
-      error: message
+      session: null,
+      user: null,
+      error: message,
+      recoveryReady: false
     }));
     return { error: message };
   }
 
-  setSnapshot((current) => ({
-    ...current,
-    status: current.session ? "signed_in" : "signed_out",
-    error: null,
-    pendingEmail: email
-  }));
-
+  applySession(data.session);
   return { error: null };
 }
 
-export async function verifyEmailOtp(email: string, token: string): Promise<{ error: string | null }> {
+export async function signUpWithPassword(email: string, password: string): Promise<{ error: string | null }> {
   if (isLocalDevAuthBypassed()) {
     applyLocalDevBypass();
     return { error: null };
   }
 
   await bootstrapAuth();
+  beginPublicAuthAction();
 
   const clientResult = getSupabaseClient();
 
@@ -250,14 +286,15 @@ export async function verifyEmailOtp(email: string, token: string): Promise<{ er
     return { error: clientResult.error };
   }
 
-  const { data, error } = await clientResult.client.auth.verifyOtp({
+  const redirectTo = getBrowserRedirectUrl("/login");
+  const { data, error } = await clientResult.client.auth.signUp({
     email,
-    token,
-    type: "email"
+    password,
+    options: redirectTo ? { emailRedirectTo: redirectTo } : undefined
   });
 
   if (error) {
-    const message = getErrorMessage(error, "Unable to verify the email code.");
+    const message = getErrorMessage(error, "Unable to create the account.");
     setSnapshot((current) => ({
       ...current,
       status: "signed_out",
@@ -268,13 +305,165 @@ export async function verifyEmailOtp(email: string, token: string): Promise<{ er
 
   if (data.session) {
     applySession(data.session);
+    return { error: null };
+  }
+
+  setPendingOtp(email, "email");
+  return { error: null };
+}
+
+export async function sendRecoveryEmail(email: string): Promise<{ error: string | null }> {
+  if (isLocalDevAuthBypassed()) {
+    applyLocalDevBypass();
+    return { error: null };
+  }
+
+  await bootstrapAuth();
+  beginPublicAuthAction();
+
+  const clientResult = getSupabaseClient();
+
+  if (!clientResult.client) {
+    setSnapshot((current) => ({
+      ...current,
+      status: "signed_out",
+      error: clientResult.error
+    }));
+    return { error: clientResult.error };
+  }
+
+  const redirectTo = getBrowserRedirectUrl("/login");
+  const { error } = await clientResult.client.auth.resetPasswordForEmail(
+    email,
+    redirectTo ? { redirectTo } : undefined
+  );
+
+  if (error) {
+    const message = getErrorMessage(error, "Unable to send the recovery email.");
+    setSnapshot((current) => ({
+      ...current,
+      status: "signed_out",
+      error: message
+    }));
+    return { error: message };
+  }
+
+  setPendingOtp(email, "recovery");
+  return { error: null };
+}
+
+export async function verifyEmailOtp(
+  email: string,
+  token: string,
+  type: PendingOtpType
+): Promise<{ error: string | null }> {
+  if (isLocalDevAuthBypassed()) {
+    applyLocalDevBypass();
+    return { error: null };
+  }
+
+  await bootstrapAuth();
+
+  const clientResult = getSupabaseClient();
+
+  if (!clientResult.client) {
+    setSnapshot((current) => ({
+      ...current,
+      status: "signed_out",
+      error: clientResult.error
+    }));
+    return { error: clientResult.error };
+  }
+
+  const { data, error } = await clientResult.client.auth.verifyOtp({ email, token, type });
+
+  if (error) {
+    const fallback = type === "recovery"
+      ? "Unable to verify the recovery code."
+      : "Unable to verify the email code.";
+    const message = getErrorMessage(error, fallback);
+    setSnapshot((current) => ({
+      ...current,
+      status: "signed_out",
+      error: message
+    }));
+    return { error: message };
+  }
+
+  if (type === "recovery") {
+    if (!data.session) {
+      const message = "Unable to open the password reset session.";
+      setSnapshot((current) => ({
+        ...current,
+        status: "signed_out",
+        error: message,
+        recoveryReady: false
+      }));
+      return { error: message };
+    }
+
+    applySession(data.session, null, { recoveryReady: true });
+    return { error: null };
+  }
+
+  if (data.session) {
+    applySession(data.session);
   } else {
     setSnapshot((current) => ({
       ...current,
-      error: null
+      status: "signed_out",
+      error: null,
+      pendingEmail: "",
+      pendingOtpType: null,
+      recoveryReady: false
     }));
   }
 
+  return { error: null };
+}
+
+export async function updatePassword(password: string): Promise<{ error: string | null }> {
+  if (isLocalDevAuthBypassed()) {
+    applyLocalDevBypass();
+    return { error: null };
+  }
+
+  await bootstrapAuth();
+
+  const clientResult = getSupabaseClient();
+
+  if (!clientResult.client) {
+    setSnapshot((current) => ({
+      ...current,
+      status: "signed_out",
+      error: clientResult.error
+    }));
+    return { error: clientResult.error };
+  }
+
+  const { error } = await clientResult.client.auth.updateUser({ password });
+
+  if (error) {
+    const message = getErrorMessage(error, "Unable to update the password.");
+    setSnapshot((current) => ({
+      ...current,
+      error: message
+    }));
+    return { error: message };
+  }
+
+  const signOutResult = await clientResult.client.auth.signOut();
+
+  if (signOutResult.error) {
+    const message = getErrorMessage(signOutResult.error, "Password updated, but sign-out failed.");
+    setSnapshot((current) => ({
+      ...current,
+      error: message
+    }));
+    return { error: message };
+  }
+
+  applySession(null);
   return { error: null };
 }
 

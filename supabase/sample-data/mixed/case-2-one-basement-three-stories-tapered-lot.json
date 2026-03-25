@@ -1,0 +1,188 @@
+{
+  "id": "case-mixed-2-tapered-lot",
+  "name": "Mixed Case 2 Tapered Lot",
+  "defaultStoryHeightFt": 10,
+  "levels": [
+    {
+      "id": "level-b1",
+      "name": "Basement 1",
+      "elevationFt": -10,
+      "heightFt": 10
+    },
+    {
+      "id": "level-1",
+      "name": "Level 1",
+      "elevationFt": 0,
+      "heightFt": 10
+    },
+    {
+      "id": "level-2",
+      "name": "Level 2",
+      "elevationFt": 10,
+      "heightFt": 10
+    },
+    {
+      "id": "level-3",
+      "name": "Level 3",
+      "elevationFt": 20,
+      "heightFt": 10
+    }
+  ],
+  "spaces": [
+    {
+      "id": "space-level-b1-west",
+      "levelId": "level-b1",
+      "name": "Basement 1 West Suite",
+      "footprint": [
+        { "xFt": 18, "yFt": 16 },
+        { "xFt": 46, "yFt": 16 },
+        { "xFt": 50, "yFt": 28 },
+        { "xFt": 28, "yFt": 34 },
+        { "xFt": 16, "yFt": 26 }
+      ]
+    },
+    {
+      "id": "space-level-b1-east",
+      "levelId": "level-b1",
+      "name": "Basement 1 East Suite",
+      "footprint": [
+        { "xFt": 52, "yFt": 16 },
+        { "xFt": 88, "yFt": 16 },
+        { "xFt": 96, "yFt": 30 },
+        { "xFt": 68, "yFt": 36 },
+        { "xFt": 50, "yFt": 28 }
+      ]
+    },
+    {
+      "id": "space-level-b1-south",
+      "levelId": "level-b1",
+      "name": "Basement 1 South Suite",
+      "footprint": [
+        { "xFt": 28, "yFt": 40 },
+        { "xFt": 74, "yFt": 38 },
+        { "xFt": 82, "yFt": 68 },
+        { "xFt": 34, "yFt": 74 },
+        { "xFt": 20, "yFt": 54 }
+      ]
+    },
+    {
+      "id": "space-level-1-west",
+      "levelId": "level-1",
+      "name": "Level 1 West Suite",
+      "footprint": [
+        { "xFt": 18, "yFt": 16 },
+        { "xFt": 46, "yFt": 16 },
+        { "xFt": 50, "yFt": 28 },
+        { "xFt": 28, "yFt": 34 },
+        { "xFt": 16, "yFt": 26 }
+      ]
+    },
+    {
+      "id": "space-level-1-east",
+      "levelId": "level-1",
+      "name": "Level 1 East Suite",
+      "footprint": [
+        { "xFt": 52, "yFt": 16 },
+        { "xFt": 88, "yFt": 16 },
+        { "xFt": 96, "yFt": 30 },
+        { "xFt": 68, "yFt": 36 },
+        { "xFt": 50, "yFt": 28 }
+      ]
+    },
+    {
+      "id": "space-level-1-south",
+      "levelId": "level-1",
+      "name": "Level 1 South Suite",
+      "footprint": [
+        { "xFt": 28, "yFt": 40 },
+        { "xFt": 74, "yFt": 38 },
+        { "xFt": 82, "yFt": 68 },
+        { "xFt": 34, "yFt": 74 },
+        { "xFt": 20, "yFt": 54 }
+      ]
+    },
+    {
+      "id": "space-level-2-west",
+      "levelId": "level-2",
+      "name": "Level 2 West Suite",
+      "footprint": [
+        { "xFt": 18, "yFt": 16 },
+        { "xFt": 46, "yFt": 16 },
+        { "xFt": 50, "yFt": 28 },
+        { "xFt": 28, "yFt": 34 },
+        { "xFt": 16, "yFt": 26 }
+      ]
+    },
+    {
+      "id": "space-level-2-east",
+      "levelId": "level-2",
+      "name": "Level 2 East Suite",
+      "footprint": [
+        { "xFt": 52, "yFt": 16 },
+        { "xFt": 88, "yFt": 16 },
+        { "xFt": 96, "yFt": 30 },
+        { "xFt": 68, "yFt": 36 },
+        { "xFt": 50, "yFt": 28 }
+      ]
+    },
+    {
+      "id": "space-level-2-south",
+      "levelId": "level-2",
+      "name": "Level 2 South Suite",
+      "footprint": [
+        { "xFt": 28, "yFt": 40 },
+        { "xFt": 74, "yFt": 38 },
+        { "xFt": 82, "yFt": 68 },
+        { "xFt": 34, "yFt": 74 },
+        { "xFt": 20, "yFt": 54 }
+      ]
+    },
+    {
+      "id": "space-level-3-west",
+      "levelId": "level-3",
+      "name": "Level 3 West Suite",
+      "footprint": [
+        { "xFt": 18, "yFt": 16 },
+        { "xFt": 46, "yFt": 16 },
+        { "xFt": 50, "yFt": 28 },
+        { "xFt": 28, "yFt": 34 },
+        { "xFt": 16, "yFt": 26 }
+      ]
+    },
+    {
+      "id": "space-level-3-east",
+      "levelId": "level-3",
+      "name": "Level 3 East Suite",
+      "footprint": [
+        { "xFt": 52, "yFt": 16 },
+        { "xFt": 88, "yFt": 16 },
+        { "xFt": 96, "yFt": 30 },
+        { "xFt": 68, "yFt": 36 },
+        { "xFt": 50, "yFt": 28 }
+      ]
+    },
+    {
+      "id": "space-level-3-south",
+      "levelId": "level-3",
+      "name": "Level 3 South Suite",
+      "footprint": [
+        { "xFt": 28, "yFt": 40 },
+        { "xFt": 74, "yFt": 38 },
+        { "xFt": 82, "yFt": 68 },
+        { "xFt": 34, "yFt": 74 },
+        { "xFt": 20, "yFt": 54 }
+      ]
+    }
+  ],
+  "sitePlan": {
+    "levelId": "level-1",
+    "boundary": [
+      { "xFt": 0, "yFt": 0 },
+      { "xFt": 110, "yFt": 0 },
+      { "xFt": 124, "yFt": 42 },
+      { "xFt": 102, "yFt": 92 },
+      { "xFt": 18, "yFt": 86 }
+    ],
+    "edgeSetbacksFt": [5, 5, 5, 5, 5]
+  }
+}

@@ -7,6 +7,7 @@ import {
 import type { Selection } from "./ui-store";
 
 export type SpacePrismEmphasis = "normal" | "active-level" | "selected";
+export type ThreeDVisibilityMode = "active-floor-only" | "all-levels";
 
 export type SceneVertex = {
   position: [number, number, number];
@@ -32,6 +33,7 @@ export type SceneExtents = {
 export type SpaceScenePayload = {
   items: SpacePrismRenderItem[];
   vertices: SceneVertex[];
+  edgeVertices: SceneVertex[];
   extents: SceneExtents;
   hasVisibleItems: boolean;
 };
@@ -177,6 +179,18 @@ function getBaseColor(emphasis: SpacePrismEmphasis): [number, number, number, nu
   return [0.48, 0.58, 0.7, 1];
 }
 
+function getEdgeColor(emphasis: SpacePrismEmphasis): [number, number, number, number] {
+  if (emphasis === "selected") {
+    return [1, 0.9, 0.52, 1];
+  }
+
+  if (emphasis === "active-level") {
+    return [0.9, 0.97, 1, 1];
+  }
+
+  return [0.76, 0.84, 0.93, 1];
+}
+
 function pushTriangle(
   vertices: SceneVertex[],
   a: [number, number, number],
@@ -187,6 +201,16 @@ function pushTriangle(
   vertices.push({ position: a, color });
   vertices.push({ position: b, color });
   vertices.push({ position: c, color });
+}
+
+function pushLine(
+  vertices: SceneVertex[],
+  start: [number, number, number],
+  end: [number, number, number],
+  color: [number, number, number, number]
+): void {
+  vertices.push({ position: start, color });
+  vertices.push({ position: end, color });
 }
 
 function toPosition(point: Point2Ft, zFt: number): [number, number, number] {
@@ -245,19 +269,59 @@ function appendPolygonPrismVertices(
   }
 }
 
+function appendPolygonPrismEdges(
+  edgeVertices: SceneVertex[],
+  footprint: Point2Ft[],
+  minZFt: number,
+  sizeZFt: number,
+  emphasis: SpacePrismEmphasis
+): void {
+  const topZFt = minZFt + sizeZFt;
+  const edgeColor = getEdgeColor(emphasis);
+
+  for (let index = 0; index < footprint.length; index += 1) {
+    const current = footprint[index];
+    const next = footprint[(index + 1) % footprint.length];
+    const currentBottom = toPosition(current, minZFt);
+    const currentTop = toPosition(current, topZFt);
+
+    pushLine(edgeVertices, currentBottom, toPosition(next, minZFt), edgeColor);
+    pushLine(edgeVertices, currentTop, toPosition(next, topZFt), edgeColor);
+    pushLine(edgeVertices, currentBottom, currentTop, edgeColor);
+  }
+}
+
+function shouldIncludeSpace(
+  visibilityMode: ThreeDVisibilityMode,
+  activeLevelId: string | null,
+  spaceLevelId: string
+): boolean {
+  if (visibilityMode === "all-levels") {
+    return true;
+  }
+
+  if (!activeLevelId) {
+    return true;
+  }
+
+  return spaceLevelId === activeLevelId;
+}
+
 export function buildSpaceScenePayload(
   doc: ProjectDoc,
-  input: { activeLevelId: string | null; selection: Selection }
+  input: { activeLevelId: string | null; selection: Selection; visibilityMode: ThreeDVisibilityMode }
 ): SpaceScenePayload {
   const levelsById = new Map(doc.levels.map((level) => [level.id, level]));
   const items: SpacePrismRenderItem[] = [];
   const vertices: SceneVertex[] = [];
+  const edgeVertices: SceneVertex[] = [];
+  let extents: SceneExtents | null = null;
 
-  const extents = doc.spaces.reduce<SceneExtents | null>((currentExtents, space) => {
+  for (const space of doc.spaces) {
     const level = levelsById.get(space.levelId);
 
-    if (!level || (input.activeLevelId && space.levelId !== input.activeLevelId)) {
-      return currentExtents;
+    if (!level || !shouldIncludeSpace(input.visibilityMode, input.activeLevelId, space.levelId)) {
+      continue;
     }
 
     const emphasis = getEmphasis(input.selection, input.activeLevelId, space.id, space.levelId);
@@ -269,9 +333,10 @@ export function buildSpaceScenePayload(
       emphasis
     });
     appendPolygonPrismVertices(vertices, space.footprint, level.elevationFt, level.heightFt, emphasis);
+    appendPolygonPrismEdges(edgeVertices, space.footprint, level.elevationFt, level.heightFt, emphasis);
 
-    if (!currentExtents) {
-      return {
+    if (!extents) {
+      extents = {
         minXFt: bounds.minXFt,
         minYFt: bounds.minYFt,
         minZFt: level.elevationFt,
@@ -279,22 +344,24 @@ export function buildSpaceScenePayload(
         maxYFt: bounds.maxYFt,
         maxZFt: level.elevationFt + level.heightFt
       };
+      continue;
     }
 
-    return {
-      minXFt: Math.min(currentExtents.minXFt, bounds.minXFt),
-      minYFt: Math.min(currentExtents.minYFt, bounds.minYFt),
-      minZFt: Math.min(currentExtents.minZFt, level.elevationFt),
-      maxXFt: Math.max(currentExtents.maxXFt, bounds.maxXFt),
-      maxYFt: Math.max(currentExtents.maxYFt, bounds.maxYFt),
-      maxZFt: Math.max(currentExtents.maxZFt, level.elevationFt + level.heightFt)
+    extents = {
+      minXFt: Math.min(extents.minXFt, bounds.minXFt),
+      minYFt: Math.min(extents.minYFt, bounds.minYFt),
+      minZFt: Math.min(extents.minZFt, level.elevationFt),
+      maxXFt: Math.max(extents.maxXFt, bounds.maxXFt),
+      maxYFt: Math.max(extents.maxYFt, bounds.maxYFt),
+      maxZFt: Math.max(extents.maxZFt, level.elevationFt + level.heightFt)
     };
-  }, null);
+  }
 
   if (!extents || items.length === 0) {
     return {
       items: [],
       vertices: [],
+      edgeVertices: [],
       extents: DEFAULT_SCENE_EXTENTS,
       hasVisibleItems: false
     };
@@ -303,6 +370,7 @@ export function buildSpaceScenePayload(
   return {
     items,
     vertices,
+    edgeVertices,
     extents,
     hasVisibleItems: true
   };

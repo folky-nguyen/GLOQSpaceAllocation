@@ -54,8 +54,8 @@ Combined repo map and document index. This is the first lookup surface for non-b
 - `apps/web/src/auth.ts`: browser auth client and auth snapshot store.
 - `apps/web/src/project-doc.ts`: current `ProjectDoc`, `Level`, and `Space` document helpers.
 - `apps/web/src/space-scene.ts`: derived 3D scene payload and default camera helpers.
-- `apps/web/src/test-cases.ts`: manifest and JSON loaders for level, space, and mixed validation cases.
-- `apps/web/src/test-dashboard.tsx`: draggable in-workspace test dashboard for loading sample cases.
+- `apps/web/src/test-cases.ts`: manifest and JSON loaders for the mixed site/level/layout validation cases.
+- `apps/web/src/test-dashboard.tsx`: draggable in-workspace test dashboard for loading the three mixed validation cases.
 - `apps/web/src/three-d-viewport.tsx`: 3D viewport lifecycle, wasm mount, and camera interactions.
 - `apps/web/src/units.ts`: feet-inch parsing, default-unit bare-number parsing, formatting, and conversion helpers.
 - `apps/web/src/units-inspector.tsx`: manual diagnostic panel for unit parsing, formatting, and conversion checks.
@@ -67,9 +67,7 @@ Combined repo map and document index. This is the first lookup surface for non-b
 - `crates/render-wasm/src/lib.rs`: wasm WebGPU entry points.
 - `supabase/migrations/20260324170000_init.sql`: current schema and storage bootstrap.
 - `supabase/sample-data/README.md`: conventions for checked-in sample `ProjectDoc` fixtures used by manual validation.
-- `supabase/sample-data/levels/*.json`: level-focused sample `ProjectDoc` fixtures.
-- `supabase/sample-data/spaces/*.json`: space-layout sample `ProjectDoc` fixtures with polygon apartments.
-- `supabase/sample-data/mixed/*.json`: combined level + apartment layout sample `ProjectDoc` fixtures.
+- `supabase/sample-data/mixed/*.json`: mixed site-plan, level-stack, and polygon-space sample `ProjectDoc` fixtures with per-edge setbacks.
 - `vercel.json`: Vercel build/output config and SPA rewrite fallback for preview deployments.
 - `setup/ensure-render-wasm.mjs`: build-time guard for `crates/render-wasm/pkg` used by web dev and production builds.
 
@@ -83,6 +81,7 @@ Combined repo map and document index. This is the first lookup surface for non-b
 - `004 supabase project persistence.md`: define thin project, member, and snapshot persistence in Supabase with JSONB snapshots.
 - `005 supabase auth in web.md`: wire Supabase passwordless auth into the web app and protect the editor route.
 - `006 supabase bearer jwt auth.md`: verify Supabase Bearer tokens in the API and expose authenticated user context through `/api/me`.
+- `006.01 email password auth in web.md`: switch the web login flow to email + password and reserve OTP for signup confirmation and password recovery.
 - `007 units module.md`: add core feet-inch parsing, formatting, conversion, and tests for the imperial units layer.
 - `007.01 units parser hardening.md`: expand shorthand imperial parsing and tighten parser behavior with broader test coverage.
 - `007.02 decimal-inch and default-unit parsing.md`: accept decimal-inch input and unit-aware bare numeric parsing with feet as the default bare unit.
@@ -93,6 +92,10 @@ Combined repo map and document index. This is the first lookup surface for non-b
 - `011 overlay-safe editor shell.md`: harden the editor shell layout so ribbon, workspace chrome, and overlays do not overlap under zoom, DPI, or text growth.
 - `012 test menu and sample case fixtures.md`: original test-menu note, now superseded by `012.01`.
 - `012.01 draggable test dashboard and polygon apartment cases.md`: replace the flyout menu with a draggable test dashboard and require polygon apartment sample cases for level, space, and mixed validation.
+- `013 3d visibility modes and space edge readability.md`: add `Active Floor Only` and `All Levels` 3D scope modes plus colored space-edge readability.
+- `013.01 3d view recovery and regression guards.md`: add the smallest hardening guardrails for sticky 3D errors and default-scope resets after full document replacement.
+- `014 site plan setbacks and mixed cases.md`: add a `Site Plan` view, per-edge setbacks, and reduce validation fixtures to three mixed site/layout cases.
+- `014.01 site plan mixed case hardening.md`: patch the mixed-case footprint regression and add one small sample-data containment guard.
 
 ### Bug Notes
 

@@ -1,10 +1,12 @@
 import { create } from "zustand";
 
-export type ViewMode = "3d" | "plan";
+export type ViewId = "view-3d" | "view-plan" | "view-site-plan";
+export type ViewMode = "3d" | "plan" | "site-plan";
 export type SelectMode = "pick-many" | "sweep";
 
 export type Selection =
-  | { kind: "view"; id: "view-3d" | "view-plan" }
+  | { kind: "view"; id: ViewId }
+  | { kind: "site-edge"; edgeIndex: number }
   | { kind: "level"; id: string }
   | { kind: "space"; id: string }
   | { kind: "space-set"; ids: string[] }
@@ -37,13 +39,19 @@ type UiStore = {
   setActiveView: (view: ViewMode) => void;
   setSelectMode: (mode: SelectMode) => void;
   setSelection: (selection: Selection) => void;
+  resetSessionUi: () => void;
+};
+
+const defaultSessionUiState: Pick<UiStore, "activeView" | "selectMode" | "selection"> = {
+  activeView: "plan",
+  selectMode: "pick-many",
+  selection: { kind: "view", id: "view-plan" }
 };
 
 export const useUiStore = create<UiStore>((set) => ({
-  activeView: "plan",
-  selectMode: "pick-many",
-  selection: { kind: "view", id: "view-plan" },
+  ...defaultSessionUiState,
   setActiveView: (activeView) => set({ activeView }),
   setSelectMode: (selectMode) => set({ selectMode }),
-  setSelection: (selection) => set({ selection })
+  setSelection: (selection) => set({ selection }),
+  resetSessionUi: () => set(defaultSessionUiState)
 }));

@@ -6,7 +6,8 @@ import {
   getDefaultOrbitCamera,
   getOrbitCameraFrame,
   getOrbitCameraViewProjectionMatrix,
-  type OrbitCamera
+  type OrbitCamera,
+  type ThreeDVisibilityMode
 } from "./space-scene";
 
 type ThreeDViewportProps = {
@@ -15,6 +16,8 @@ type ThreeDViewportProps = {
   activeLevelName: string;
   selection: Selection;
   selectionLabel: string;
+  visibilityMode: ThreeDVisibilityMode;
+  onChangeVisibilityMode: (mode: ThreeDVisibilityMode) => void;
 };
 
 type RendererHandle = {
@@ -32,6 +35,11 @@ type RenderWasmModule = {
 
 type ViewportPhase = "loading" | "ready" | "empty" | "unsupported" | "error";
 type DragMode = "orbit" | "pan";
+
+const visibilityModeOptions: Array<{ value: ThreeDVisibilityMode; label: string }> = [
+  { value: "active-floor-only", label: "Active Floor Only" },
+  { value: "all-levels", label: "All Levels" }
+];
 
 let renderWasmModulePromise: Promise<RenderWasmModule> | null = null;
 
@@ -65,14 +73,32 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
+function getSelectionRecoveryKey(selection: Selection): string {
+  if (!selection) {
+    return "none";
+  }
+
+  if (selection.kind === "space-set") {
+    return `space-set:${selection.ids.join(",")}`;
+  }
+
+  if (selection.kind === "site-edge") {
+    return `site-edge:${selection.edgeIndex}`;
+  }
+
+  return `${selection.kind}:${selection.id}`;
+}
+
 export default function ThreeDViewport({
   project,
   activeLevelId,
   activeLevelName,
   selection,
-  selectionLabel
+  selectionLabel,
+  visibilityMode,
+  onChangeVisibilityMode
 }: ThreeDViewportProps) {
-  const scene = buildSpaceScenePayload(project, { activeLevelId, selection });
+  const scene = buildSpaceScenePayload(project, { activeLevelId, selection, visibilityMode });
   const [phase, setPhase] = useState<ViewportPhase>(scene.hasVisibleItems ? "loading" : "empty");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [camera, setCamera] = useState<OrbitCamera>(() => getDefaultOrbitCamera(scene));
@@ -82,17 +108,40 @@ export default function ThreeDViewport({
   const rendererRef = useRef<RendererHandle | null>(null);
   const dragRef = useRef<{ pointerId: number; mode: DragMode; lastX: number; lastY: number } | null>(null);
   const hasFitVisibleSceneRef = useRef(false);
+  const previousVisibilityModeRef = useRef<ThreeDVisibilityMode>(visibilityMode);
+  const errorRecoveryKeyRef = useRef<string | null>(null);
+  const hasSpacesOutsideActiveLevel = visibilityMode === "active-floor-only"
+    && project.spaces.some((space) => space.levelId !== activeLevelId);
+  const recoveryKey = [
+    project.id,
+    activeLevelId,
+    visibilityMode,
+    getSelectionRecoveryKey(selection),
+    scene.hasVisibleItems ? "visible" : "empty",
+    scene.items.map((item) => `${item.id}:${item.emphasis}`).join(";"),
+    scene.extents.minXFt,
+    scene.extents.minYFt,
+    scene.extents.minZFt,
+    scene.extents.maxXFt,
+    scene.extents.maxYFt,
+    scene.extents.maxZFt
+  ].join("|");
 
   useEffect(() => {
     if (!scene.hasVisibleItems) {
       hasFitVisibleSceneRef.current = false;
       setCamera(getDefaultOrbitCamera(scene));
-      setPhase("empty");
-      setErrorMessage(null);
+      setPhase((current) => (current === "error" || current === "unsupported" ? current : "empty"));
       return;
     }
 
-    setPhase((current) => (current === "ready" ? current : "loading"));
+    setPhase((current) => {
+      if (current === "error" || current === "unsupported") {
+        return current;
+      }
+
+      return rendererRef.current ? "ready" : "loading";
+    });
 
     if (!hasFitVisibleSceneRef.current) {
       hasFitVisibleSceneRef.current = true;
@@ -107,6 +156,53 @@ export default function ThreeDViewport({
     scene.extents.maxYFt,
     scene.extents.maxZFt
   ]);
+
+  useEffect(() => {
+    if (previousVisibilityModeRef.current === visibilityMode) {
+      return;
+    }
+
+    previousVisibilityModeRef.current = visibilityMode;
+
+    if (!scene.hasVisibleItems) {
+      return;
+    }
+
+    hasFitVisibleSceneRef.current = true;
+    setCamera(getDefaultOrbitCamera(scene));
+  }, [
+    visibilityMode,
+    scene.hasVisibleItems,
+    scene.extents.minXFt,
+    scene.extents.minYFt,
+    scene.extents.minZFt,
+    scene.extents.maxXFt,
+    scene.extents.maxYFt,
+    scene.extents.maxZFt
+  ]);
+
+  useEffect(() => {
+    if (phase !== "error") {
+      errorRecoveryKeyRef.current = null;
+      return;
+    }
+
+    if (errorRecoveryKeyRef.current === null) {
+      errorRecoveryKeyRef.current = recoveryKey;
+      return;
+    }
+
+    if (errorRecoveryKeyRef.current === recoveryKey) {
+      return;
+    }
+
+    errorRecoveryKeyRef.current = recoveryKey;
+    rendererRef.current?.free?.();
+    rendererRef.current = null;
+    dragRef.current = null;
+    setErrorMessage(null);
+    setPhase(scene.hasVisibleItems ? "loading" : "empty");
+  }, [phase, recoveryKey, scene.hasVisibleItems]);
 
   useEffect(() => {
     const surface = surfaceRef.current;
@@ -203,7 +299,7 @@ export default function ThreeDViewport({
   useEffect(() => {
     const renderer = rendererRef.current;
 
-    if (!renderer || phase !== "ready" || !scene.hasVisibleItems) {
+    if (!renderer || phase === "loading" || phase === "unsupported" || phase === "error") {
       return;
     }
 
@@ -217,7 +313,7 @@ export default function ThreeDViewport({
       setPhase("error");
       setErrorMessage(getErrorMessage(error));
     }
-  }, [activeLevelId, camera, phase, project, selection, viewportSize.height, viewportSize.width]);
+  }, [activeLevelId, camera, phase, project, selection, visibilityMode, viewportSize.height, viewportSize.width]);
 
   useEffect(() => (
     () => {
@@ -312,7 +408,7 @@ export default function ThreeDViewport({
       : phase === "error"
         ? "3D renderer error"
         : phase === "empty"
-          ? "No spaces to render"
+          ? (hasSpacesOutsideActiveLevel ? "No spaces on the active floor" : "No spaces to render")
           : null;
   const stateBody = phase === "loading"
     ? "Initializing the wasm renderer and preparing the current project scene."
@@ -321,7 +417,11 @@ export default function ThreeDViewport({
       : phase === "error"
         ? errorMessage
         : phase === "empty"
-          ? "Add spaces to the project to generate 3D polygon extrusions."
+          ? (
+            hasSpacesOutsideActiveLevel
+              ? "The active floor has no spaces in the current 3D scope. Switch to All Levels to inspect the rest of the model."
+              : "Add spaces to the project to generate 3D polygon extrusions."
+          )
           : null;
 
   return (
@@ -344,6 +444,22 @@ export default function ThreeDViewport({
             <p className="viewport-subtitle">Orbit drag, Shift+drag pan, wheel zoom.</p>
           </div>
           <div className="three-d-controls">
+            <div className="three-d-scope" role="group" aria-label="3D visibility scope">
+              <span className="three-d-scope-label">Scope</span>
+              <div className="three-d-scope-buttons">
+                {visibilityModeOptions.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    className={`three-d-scope-button ${visibilityMode === option.value ? "is-active" : ""}`}
+                    aria-pressed={visibilityMode === option.value}
+                    onClick={() => onChangeVisibilityMode(option.value)}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            </div>
             <button
               type="button"
               className="level-manager-button"
@@ -360,6 +476,10 @@ export default function ThreeDViewport({
             <div>
               <dt>Camera</dt>
               <dd>Perspective</dd>
+            </div>
+            <div>
+              <dt>Scope</dt>
+              <dd>{visibilityMode === "all-levels" ? "All Levels" : "Active Floor Only"}</dd>
             </div>
             <div>
               <dt>Active level</dt>
@@ -384,6 +504,15 @@ export default function ThreeDViewport({
           <div className="three-d-state">
             <strong>{stateTitle}</strong>
             <span>{stateBody}</span>
+            {phase === "empty" && hasSpacesOutsideActiveLevel ? (
+              <button
+                type="button"
+                className="level-manager-button three-d-state-action"
+                onClick={() => onChangeVisibilityMode("all-levels")}
+              >
+                Show All Levels
+              </button>
+            ) : null}
           </div>
         ) : null}
       </div>

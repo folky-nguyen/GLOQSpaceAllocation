@@ -3,9 +3,7 @@ import type { SampleCaseManifest } from "./test-cases";
 
 type TestDashboardProps = {
   workspaceRef: RefObject<HTMLElement | null>;
-  levelCases: SampleCaseManifest[];
-  spaceCases: SampleCaseManifest[];
-  mixedCases: SampleCaseManifest[];
+  cases: SampleCaseManifest[];
   activeCaseId: string | null;
   onLoadCase: (sampleCase: SampleCaseManifest) => void;
   onClose: () => void;
@@ -51,7 +49,7 @@ function clampDashboardPosition(
 
 function getActiveCaseNote(activeCase: SampleCaseManifest | null): string {
   if (!activeCase) {
-    return "Choose a level case, a space layout case, or one of the three mixed presets.";
+    return "Choose one mixed case with levels, site polygon, setbacks, and spaces in one snapshot-compatible document.";
   }
 
   return `${activeCase.label}: ${activeCase.description}`;
@@ -59,9 +57,7 @@ function getActiveCaseNote(activeCase: SampleCaseManifest | null): string {
 
 export default function TestDashboard({
   workspaceRef,
-  levelCases,
-  spaceCases,
-  mixedCases,
+  cases,
   activeCaseId,
   onLoadCase,
   onClose
@@ -69,32 +65,9 @@ export default function TestDashboard({
   const panelRef = useRef<HTMLDivElement | null>(null);
   const dragStateRef = useRef<DashboardDragState | null>(null);
   const [position, setPosition] = useState<DashboardPosition>(INITIAL_DASHBOARD_POSITION);
-  const [levelSelection, setLevelSelection] = useState("");
-  const [spaceSelection, setSpaceSelection] = useState("");
   const activeCase = activeCaseId
-    ? [...levelCases, ...spaceCases, ...mixedCases].find((sampleCase) => sampleCase.id === activeCaseId) ?? null
+    ? cases.find((sampleCase) => sampleCase.id === activeCaseId) ?? null
     : null;
-
-  useEffect(() => {
-    if (!activeCase) {
-      return;
-    }
-
-    if (activeCase.group === "level") {
-      setLevelSelection(activeCase.id);
-      setSpaceSelection("");
-      return;
-    }
-
-    if (activeCase.group === "space") {
-      setLevelSelection("");
-      setSpaceSelection(activeCase.id);
-      return;
-    }
-
-    setLevelSelection("");
-    setSpaceSelection("");
-  }, [activeCase]);
 
   useEffect(() => {
     setPosition((current) => clampDashboardPosition(current, panelRef.current, workspaceRef.current));
@@ -164,34 +137,6 @@ export default function TestDashboard({
     };
   };
 
-  const handleLevelCaseChange = (caseId: string) => {
-    setLevelSelection(caseId);
-
-    if (!caseId) {
-      return;
-    }
-
-    const selectedCase = levelCases.find((sampleCase) => sampleCase.id === caseId);
-
-    if (selectedCase) {
-      onLoadCase(selectedCase);
-    }
-  };
-
-  const handleSpaceCaseChange = (caseId: string) => {
-    setSpaceSelection(caseId);
-
-    if (!caseId) {
-      return;
-    }
-
-    const selectedCase = spaceCases.find((sampleCase) => sampleCase.id === caseId);
-
-    if (selectedCase) {
-      onLoadCase(selectedCase);
-    }
-  };
-
   return (
     <section
       ref={panelRef}
@@ -203,7 +148,7 @@ export default function TestDashboard({
       <header className="test-dashboard-header" onPointerDown={handleHeaderPointerDown}>
         <div>
           <strong>Test Dashboard</strong>
-          <span>Drag this window by the header. Sample cases replace the local editor document.</span>
+          <span>Drag this window by the header. Mixed cases replace the local editor document.</span>
         </div>
 
         <button type="button" className="level-manager-button" onClick={onClose}>
@@ -212,41 +157,13 @@ export default function TestDashboard({
       </header>
 
       <section className="test-dashboard-section">
-        <div className="test-dashboard-grid">
-          <label className="test-dashboard-field">
-            <span>Level</span>
-            <select value={levelSelection} onChange={(event) => handleLevelCaseChange(event.currentTarget.value)}>
-              <option value="">Choose level validation</option>
-              {levelCases.map((sampleCase) => (
-                <option key={sampleCase.id} value={sampleCase.id}>
-                  {sampleCase.label}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label className="test-dashboard-field">
-            <span>Space</span>
-            <select value={spaceSelection} onChange={(event) => handleSpaceCaseChange(event.currentTarget.value)}>
-              <option value="">Choose space validation</option>
-              {spaceCases.map((sampleCase) => (
-                <option key={sampleCase.id} value={sampleCase.id}>
-                  {sampleCase.label}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-      </section>
-
-      <section className="test-dashboard-section">
         <div className="test-dashboard-title-row">
           <h3>Mixed Cases</h3>
-          <span>Level + apartment polygon layouts</span>
+          <span>Levels + site polygon + setbacks + spaces</span>
         </div>
 
         <div className="test-dashboard-mixed-list">
-          {mixedCases.map((sampleCase) => (
+          {cases.map((sampleCase) => (
             <button
               key={sampleCase.id}
               type="button"

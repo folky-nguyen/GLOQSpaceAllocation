@@ -3,7 +3,8 @@ import type { Selection } from "./ui-store";
 import {
   buildSpaceScenePayload,
   getDefaultOrbitCamera,
-  type SpaceScenePayload
+  type SpaceScenePayload,
+  type ThreeDVisibilityMode
 } from "./space-scene";
 import {
   createRectangleFootprint,
@@ -58,19 +59,24 @@ function createSceneDoc(): ProjectDoc {
   };
 }
 
-function buildScene(selection: Selection = null): SpaceScenePayload {
+function buildScene(
+  selection: Selection = null,
+  visibilityMode: ThreeDVisibilityMode = "active-floor-only"
+): SpaceScenePayload {
   return buildSpaceScenePayload(createSceneDoc(), {
     activeLevelId: "level-2",
-    selection
+    selection,
+    visibilityMode
   });
 }
 
 describe("buildSpaceScenePayload", () => {
-  it("renders only the active level and precomputes mesh vertices", () => {
+  it("renders only the active level and precomputes mesh and edge vertices", () => {
     const scene = buildScene();
 
     expect(scene.items.map((item) => item.id)).toEqual(["space-l2-a"]);
     expect(scene.vertices).toHaveLength(36);
+    expect(scene.edgeVertices).toHaveLength(24);
   });
 
   it("keeps the active level elevation in the filtered scene", () => {
@@ -109,6 +115,28 @@ describe("buildSpaceScenePayload", () => {
     });
   });
 
+  it("shows spaces across all levels when the visibility mode is all-levels", () => {
+    const scene = buildScene(null, "all-levels");
+
+    expect(scene.items.map((item) => item.id)).toEqual(["space-l1-a", "space-l2-a", "space-b1-a"]);
+    expect(scene.items.map((item) => item.emphasis)).toEqual(["normal", "active-level", "normal"]);
+    expect(scene.extents).toEqual({
+      minXFt: -6,
+      minYFt: -4,
+      minZFt: -9,
+      maxXFt: 40,
+      maxYFt: 22,
+      maxZFt: 23
+    });
+  });
+
+  it("keeps the selected space strongest even when all levels are visible", () => {
+    const scene = buildScene({ kind: "space", id: "space-b1-a" }, "all-levels");
+
+    expect(scene.items.find((item) => item.id === "space-b1-a")?.emphasis).toBe("selected");
+    expect(scene.items.find((item) => item.id === "space-l2-a")?.emphasis).toBe("active-level");
+  });
+
   it("returns a safe empty scene when no spaces are present", () => {
     const scene = buildSpaceScenePayload(
       {
@@ -117,12 +145,14 @@ describe("buildSpaceScenePayload", () => {
       },
       {
         activeLevelId: "level-1",
-        selection: null
+        selection: null,
+        visibilityMode: "active-floor-only"
       }
     );
 
     expect(scene.items).toEqual([]);
     expect(scene.vertices).toEqual([]);
+    expect(scene.edgeVertices).toEqual([]);
     expect(scene.hasVisibleItems).toBe(false);
     expect(scene.extents).toEqual({
       minXFt: 0,
@@ -149,6 +179,7 @@ describe("getDefaultOrbitCamera", () => {
     const camera = getDefaultOrbitCamera({
       items: [],
       vertices: [],
+      edgeVertices: [],
       extents: {
         minXFt: 0,
         minYFt: 0,
