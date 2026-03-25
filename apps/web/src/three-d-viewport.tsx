@@ -28,9 +28,14 @@ type RendererHandle = {
   render: () => void;
 };
 
+type RendererInfoHandle = {
+  free?: () => void;
+};
+
 type RenderWasmModule = {
   default: (input?: unknown) => Promise<unknown>;
   create_renderer: (canvas: HTMLCanvasElement) => Promise<RendererHandle>;
+  probe_webgpu: () => Promise<RendererInfoHandle>;
 };
 
 type ViewportPhase = "loading" | "ready" | "empty" | "unsupported" | "error";
@@ -55,6 +60,22 @@ function getErrorMessage(error: unknown): string {
   }
 
   return rawMessage;
+}
+
+function getStartupFailureState(error: unknown): {
+  message: string;
+  phase: Extract<ViewportPhase, "unsupported" | "error">;
+} {
+  const message = getErrorMessage(error);
+  const normalizedMessage = message.toLowerCase();
+  const isNoAdapterFailure = normalizedMessage.includes("no suitable graphics adapter")
+    || normalizedMessage.includes("webgpu found no adapters")
+    || normalizedMessage.includes("no adapters");
+
+  return {
+    message,
+    phase: isNoAdapterFailure ? "unsupported" : "error"
+  };
 }
 
 async function loadRenderWasmModule(): Promise<RenderWasmModule> {
@@ -244,7 +265,7 @@ export default function ThreeDViewport({
   useEffect(() => {
     let isCancelled = false;
 
-    if (!scene.hasVisibleItems || rendererRef.current || !canvasRef.current) {
+    if (!scene.hasVisibleItems || rendererRef.current || !canvasRef.current || phase === "unsupported") {
       return;
     }
 
@@ -271,6 +292,15 @@ export default function ThreeDViewport({
           return;
         }
 
+        const rendererInfo = await renderWasm.probe_webgpu();
+
+        if (isCancelled) {
+          rendererInfo.free?.();
+          return;
+        }
+
+        rendererInfo.free?.();
+
         const renderer = await renderWasm.create_renderer(canvas);
 
         if (isCancelled) {
@@ -286,15 +316,16 @@ export default function ThreeDViewport({
           return;
         }
 
-        setPhase("error");
-        setErrorMessage(getErrorMessage(error));
+        const failureState = getStartupFailureState(error);
+        setPhase(failureState.phase);
+        setErrorMessage(failureState.message);
       }
     })();
 
     return () => {
       isCancelled = true;
     };
-  }, [scene.hasVisibleItems, viewportSize.height, viewportSize.width]);
+  }, [phase, scene.hasVisibleItems, viewportSize.height, viewportSize.width]);
 
   useEffect(() => {
     const renderer = rendererRef.current;

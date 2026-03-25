@@ -96,6 +96,7 @@ Combined repo map and document index. This is the first lookup surface for non-b
 - `013.01 3d view recovery and regression guards.md`: add the smallest hardening guardrails for sticky 3D errors and default-scope resets after full document replacement.
 - `014 site plan setbacks and mixed cases.md`: add a `Site Plan` view, per-edge setbacks, and reduce validation fixtures to three mixed site/layout cases.
 - `014.01 site plan mixed case hardening.md`: patch the mixed-case footprint regression and add one small sample-data containment guard.
+- `014.02 3d adapter failure triage after 014.01.md`: treat the post-014.01 failure as a general 3D startup problem across all mixed cases, then distinguish adapter availability, generated wasm pkg, and true regressions before fixing or selectively reverting.
 
 ### Bug Notes
 
