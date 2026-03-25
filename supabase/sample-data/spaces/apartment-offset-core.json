@@ -1,0 +1,64 @@
+{
+  "id": "case-space-offset-core",
+  "name": "Space Case Offset Core",
+  "defaultStoryHeightFt": 10,
+  "levels": [
+    {
+      "id": "level-1",
+      "name": "Level 1",
+      "elevationFt": 0,
+      "heightFt": 10
+    }
+  ],
+  "spaces": [
+    {
+      "id": "space-b1",
+      "levelId": "level-1",
+      "name": "Apartment B1",
+      "footprint": [
+        { "xFt": 0, "yFt": 0 },
+        { "xFt": 16, "yFt": 2 },
+        { "xFt": 14, "yFt": 14 },
+        { "xFt": 6, "yFt": 18 },
+        { "xFt": -2, "yFt": 12 }
+      ]
+    },
+    {
+      "id": "space-b2",
+      "levelId": "level-1",
+      "name": "Apartment B2",
+      "footprint": [
+        { "xFt": 16, "yFt": 2 },
+        { "xFt": 30, "yFt": 0 },
+        { "xFt": 38, "yFt": 8 },
+        { "xFt": 32, "yFt": 18 },
+        { "xFt": 20, "yFt": 16 },
+        { "xFt": 14, "yFt": 14 }
+      ]
+    },
+    {
+      "id": "space-b3",
+      "levelId": "level-1",
+      "name": "Apartment B3",
+      "footprint": [
+        { "xFt": 6, "yFt": 18 },
+        { "xFt": 20, "yFt": 16 },
+        { "xFt": 18, "yFt": 30 },
+        { "xFt": 8, "yFt": 36 },
+        { "xFt": 0, "yFt": 28 }
+      ]
+    },
+    {
+      "id": "space-b4",
+      "levelId": "level-1",
+      "name": "Apartment B4",
+      "footprint": [
+        { "xFt": 20, "yFt": 16 },
+        { "xFt": 32, "yFt": 18 },
+        { "xFt": 38, "yFt": 28 },
+        { "xFt": 30, "yFt": 40 },
+        { "xFt": 18, "yFt": 30 }
+      ]
+    }
+  ]
+}

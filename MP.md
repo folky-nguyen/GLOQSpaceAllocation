@@ -5,9 +5,10 @@ Combined repo map and document index. This is the first lookup surface for non-b
 ## How To Use It
 
 - Start here when you need the right folder, note, or doc.
-- If the task is not a bug fix, read this file before searching text.
+- For every non-bug-fix task, read this file before any other repo discovery or text search.
 - If the task is a bug fix, read the matching `tasks/FB*.md` note first and come back here only if discovery is still unclear.
-- If this file is missing a new folder, doc, or repeated entry point, update it after the task.
+- End every non-bug-fix task by reopening this file and updating any folder, doc, entry point, ownership note, or repeated discovery path clarified by the task.
+- Do not treat a non-bug-fix task as complete until the `MP.md` closeout pass is done.
 
 ## Workflow Docs
 
@@ -23,7 +24,7 @@ Combined repo map and document index. This is the first lookup surface for non-b
 - `apps/web/`: React + Vite frontend shell and TypeScript editor logic.
 - `apps/api/`: Rust + axum API.
 - `crates/render-wasm/`: Rust wasm renderer crate.
-- `supabase/`: local Supabase config and SQL migrations.
+- `supabase/`: local Supabase config, SQL migrations, and checked-in sample editor data.
 - `setup/`: local preview helpers for port `3001`.
 - `tasks/`: feature notes and bug notes.
 
@@ -39,6 +40,7 @@ Combined repo map and document index. This is the first lookup surface for non-b
 | API auth and JWT verification | `apps/api/src/` |
 | WebGPU wasm renderer | `crates/render-wasm/src/` |
 | Supabase persistence | `supabase/migrations/` |
+| Sample editor cases | `supabase/sample-data/` |
 | Local preview on port `3001` | `setup/` |
 | Task context | `tasks/` |
 
@@ -49,7 +51,12 @@ Combined repo map and document index. This is the first lookup surface for non-b
 - `apps/web/src/editor-shell.tsx`: main editor UI shell.
 - `apps/web/src/auth.ts`: browser auth client and auth snapshot store.
 - `apps/web/src/project-doc.ts`: current `ProjectDoc`, `Level`, and `Space` document helpers.
-- `apps/web/src/units.ts`: feet-inch parsing, formatting, and conversion helpers.
+- `apps/web/src/space-scene.ts`: derived 3D scene payload and default camera helpers.
+- `apps/web/src/test-cases.ts`: manifest and JSON loaders for level, space, and mixed validation cases.
+- `apps/web/src/test-dashboard.tsx`: draggable in-workspace test dashboard for loading sample cases.
+- `apps/web/src/three-d-viewport.tsx`: 3D viewport lifecycle, wasm mount, and camera interactions.
+- `apps/web/src/units.ts`: feet-inch parsing, default-unit bare-number parsing, formatting, and conversion helpers.
+- `apps/web/src/units-inspector.tsx`: manual diagnostic panel for unit parsing, formatting, and conversion checks.
 - `apps/web/src/ui-store.ts`: small editor chrome store.
 - `apps/api/src/main.rs`: axum router and API wiring.
 - `apps/api/src/auth.rs`: Bearer JWT verification against Supabase JWKS.
@@ -57,6 +64,10 @@ Combined repo map and document index. This is the first lookup surface for non-b
 - `apps/api/src/error.rs`: JSON API error envelope.
 - `crates/render-wasm/src/lib.rs`: wasm WebGPU entry points.
 - `supabase/migrations/20260324170000_init.sql`: current schema and storage bootstrap.
+- `supabase/sample-data/README.md`: conventions for checked-in sample `ProjectDoc` fixtures used by manual validation.
+- `supabase/sample-data/levels/*.json`: level-focused sample `ProjectDoc` fixtures.
+- `supabase/sample-data/spaces/*.json`: space-layout sample `ProjectDoc` fixtures with polygon apartments.
+- `supabase/sample-data/mixed/*.json`: combined level + apartment layout sample `ProjectDoc` fixtures.
 
 ## Document Index
 
@@ -70,8 +81,14 @@ Combined repo map and document index. This is the first lookup surface for non-b
 - `006 supabase bearer jwt auth.md`: verify Supabase Bearer tokens in the API and expose authenticated user context through `/api/me`.
 - `007 units module.md`: add core feet-inch parsing, formatting, conversion, and tests for the imperial units layer.
 - `007.01 units parser hardening.md`: expand shorthand imperial parsing and tighten parser behavior with broader test coverage.
+- `007.02 decimal-inch and default-unit parsing.md`: accept decimal-inch input and unit-aware bare numeric parsing with feet as the default bare unit.
 - `008 level manager.md`: add level CRUD, reorder, elevation editing, and active-level-driven plan and 3D filtering.
 - `009 3d space view.md`: replace the 3D placeholder with a real WebGPU-backed viewport and simulate spaces as simple 3D prisms.
+- `009.01 3d view polish.md`: improve the 3D view presentation, naming, and scene readability without changing the ownership model.
+- `010 selection dropdown and workspace cleanup.md`: replace the dead left tool stack with one working selection dropdown and remove old workspace chrome that wasted plan space.
+- `011 overlay-safe editor shell.md`: harden the editor shell layout so ribbon, workspace chrome, and overlays do not overlap under zoom, DPI, or text growth.
+- `012 test menu and sample case fixtures.md`: original test-menu note, now superseded by `012.01`.
+- `012.01 draggable test dashboard and polygon apartment cases.md`: replace the flyout menu with a draggable test dashboard and require polygon apartment sample cases for level, space, and mixed validation.
 
 ### Bug Notes
 
@@ -84,6 +101,7 @@ Combined repo map and document index. This is the first lookup surface for non-b
 
 ## Discovery Tips
 
-- For non-bug-fix work, use this file before text search.
+- For non-bug-fix work, use this file before any text search or broad repo discovery.
+- After non-bug-fix work, do a final `MP.md` pass before reporting completion.
 - For bug-fix work, start from the matching `tasks/FB*.md` note.
 - The repo is still small, so most subsystem entry points are one file deep from the folders listed above.

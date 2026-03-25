@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   autoGenerateLevels,
+  createRectangleFootprint,
   createLevel,
   createStarterProjectDoc,
   deleteLevel,
+  getSpaceAreaSqFt,
   moveLevel,
   renameLevel,
   setDefaultStoryHeight,
@@ -38,10 +40,7 @@ describe("project-doc level mutations", () => {
           id: "space-level-2",
           levelId: addedLevel.activeLevelId,
           name: "Level 2 Office",
-          xFt: 0,
-          yFt: 0,
-          widthFt: 10,
-          depthFt: 12
+          footprint: createRectangleFootprint(0, 0, 10, 12)
         }
       ]
     };
@@ -75,10 +74,7 @@ describe("project-doc level mutations", () => {
           id: "space-reused-level",
           levelId: "level-1",
           name: "Stacked Office",
-          xFt: 2,
-          yFt: 2,
-          widthFt: 12,
-          depthFt: 14
+          footprint: createRectangleFootprint(2, 2, 12, 14)
         }
       ]
     };
@@ -109,10 +105,7 @@ describe("project-doc level mutations", () => {
           id: "space-basement-storage",
           levelId: basementLevel?.id ?? "",
           name: "Storage",
-          xFt: 1,
-          yFt: 1,
-          widthFt: 8,
-          depthFt: 10
+          footprint: createRectangleFootprint(1, 1, 8, 10)
         }
       ]
     };
@@ -125,5 +118,23 @@ describe("project-doc level mutations", () => {
     expect(result.doc.levels.map((level) => level.name)).toEqual(["Level 1"]);
     expect(result.doc.spaces.some((space) => space.name === "Storage")).toBe(false);
     expect(result.activeLevelId).toBe(result.doc.levels[0].id);
+  });
+
+  it("computes polygon area for non-rectangular spaces", () => {
+    const doc = createDoc();
+    const polygonSpace = {
+      id: "space-polygon",
+      levelId: doc.levels[0].id,
+      name: "Apartment",
+      footprint: [
+        { xFt: 0, yFt: 0 },
+        { xFt: 10, yFt: 0 },
+        { xFt: 12, yFt: 6 },
+        { xFt: 4, yFt: 12 },
+        { xFt: 0, yFt: 8 }
+      ]
+    };
+
+    expect(getSpaceAreaSqFt(polygonSpace)).toBe(106);
   });
 });

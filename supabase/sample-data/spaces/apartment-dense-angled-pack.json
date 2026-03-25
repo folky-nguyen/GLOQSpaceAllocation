@@ -1,0 +1,77 @@
+{
+  "id": "case-space-dense-angled-pack",
+  "name": "Space Case Dense Angled Pack",
+  "defaultStoryHeightFt": 10,
+  "levels": [
+    {
+      "id": "level-1",
+      "name": "Level 1",
+      "elevationFt": 0,
+      "heightFt": 10
+    }
+  ],
+  "spaces": [
+    {
+      "id": "space-c1",
+      "levelId": "level-1",
+      "name": "Apartment C1",
+      "footprint": [
+        { "xFt": 0, "yFt": 6 },
+        { "xFt": 10, "yFt": 0 },
+        { "xFt": 18, "yFt": 4 },
+        { "xFt": 16, "yFt": 14 },
+        { "xFt": 6, "yFt": 16 }
+      ]
+    },
+    {
+      "id": "space-c2",
+      "levelId": "level-1",
+      "name": "Apartment C2",
+      "footprint": [
+        { "xFt": 18, "yFt": 4 },
+        { "xFt": 30, "yFt": 2 },
+        { "xFt": 34, "yFt": 12 },
+        { "xFt": 28, "yFt": 18 },
+        { "xFt": 16, "yFt": 14 }
+      ]
+    },
+    {
+      "id": "space-c3",
+      "levelId": "level-1",
+      "name": "Apartment C3",
+      "footprint": [
+        { "xFt": 34, "yFt": 12 },
+        { "xFt": 44, "yFt": 8 },
+        { "xFt": 50, "yFt": 18 },
+        { "xFt": 46, "yFt": 28 },
+        { "xFt": 36, "yFt": 30 },
+        { "xFt": 28, "yFt": 18 }
+      ]
+    },
+    {
+      "id": "space-c4",
+      "levelId": "level-1",
+      "name": "Apartment C4",
+      "footprint": [
+        { "xFt": 6, "yFt": 16 },
+        { "xFt": 16, "yFt": 14 },
+        { "xFt": 18, "yFt": 28 },
+        { "xFt": 10, "yFt": 34 },
+        { "xFt": 0, "yFt": 28 }
+      ]
+    },
+    {
+      "id": "space-c5",
+      "levelId": "level-1",
+      "name": "Apartment C5",
+      "footprint": [
+        { "xFt": 18, "yFt": 28 },
+        { "xFt": 28, "yFt": 18 },
+        { "xFt": 36, "yFt": 30 },
+        { "xFt": 30, "yFt": 42 },
+        { "xFt": 18, "yFt": 40 },
+        { "xFt": 10, "yFt": 34 }
+      ]
+    }
+  ]
+}

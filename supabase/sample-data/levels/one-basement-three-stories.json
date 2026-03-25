@@ -1,0 +1,129 @@
+{
+  "id": "case-level-one-basement-three-stories",
+  "name": "Level Case One Basement Three Stories",
+  "defaultStoryHeightFt": 10,
+  "levels": [
+    {
+      "id": "level-b1",
+      "name": "Basement 1",
+      "elevationFt": -10,
+      "heightFt": 10
+    },
+    {
+      "id": "level-1",
+      "name": "Level 1",
+      "elevationFt": 0,
+      "heightFt": 10
+    },
+    {
+      "id": "level-2",
+      "name": "Level 2",
+      "elevationFt": 10,
+      "heightFt": 10
+    },
+    {
+      "id": "level-3",
+      "name": "Level 3",
+      "elevationFt": 20,
+      "heightFt": 10
+    }
+  ],
+  "spaces": [
+    {
+      "id": "space-b1-west",
+      "levelId": "level-b1",
+      "name": "Basement Apartment West",
+      "footprint": [
+        { "xFt": 0, "yFt": 2 },
+        { "xFt": 12, "yFt": 0 },
+        { "xFt": 18, "yFt": 6 },
+        { "xFt": 16, "yFt": 18 },
+        { "xFt": 4, "yFt": 16 }
+      ]
+    },
+    {
+      "id": "space-b1-east",
+      "levelId": "level-b1",
+      "name": "Basement Apartment East",
+      "footprint": [
+        { "xFt": 18, "yFt": 6 },
+        { "xFt": 30, "yFt": 3 },
+        { "xFt": 36, "yFt": 12 },
+        { "xFt": 32, "yFt": 22 },
+        { "xFt": 16, "yFt": 18 }
+      ]
+    },
+    {
+      "id": "space-l1-west",
+      "levelId": "level-1",
+      "name": "Level 1 Apartment West",
+      "footprint": [
+        { "xFt": 0, "yFt": 2 },
+        { "xFt": 12, "yFt": 0 },
+        { "xFt": 18, "yFt": 6 },
+        { "xFt": 16, "yFt": 18 },
+        { "xFt": 4, "yFt": 16 }
+      ]
+    },
+    {
+      "id": "space-l1-east",
+      "levelId": "level-1",
+      "name": "Level 1 Apartment East",
+      "footprint": [
+        { "xFt": 18, "yFt": 6 },
+        { "xFt": 30, "yFt": 3 },
+        { "xFt": 36, "yFt": 12 },
+        { "xFt": 32, "yFt": 22 },
+        { "xFt": 16, "yFt": 18 }
+      ]
+    },
+    {
+      "id": "space-l2-west",
+      "levelId": "level-2",
+      "name": "Level 2 Apartment West",
+      "footprint": [
+        { "xFt": 0, "yFt": 2 },
+        { "xFt": 12, "yFt": 0 },
+        { "xFt": 18, "yFt": 6 },
+        { "xFt": 16, "yFt": 18 },
+        { "xFt": 4, "yFt": 16 }
+      ]
+    },
+    {
+      "id": "space-l2-east",
+      "levelId": "level-2",
+      "name": "Level 2 Apartment East",
+      "footprint": [
+        { "xFt": 18, "yFt": 6 },
+        { "xFt": 30, "yFt": 3 },
+        { "xFt": 36, "yFt": 12 },
+        { "xFt": 32, "yFt": 22 },
+        { "xFt": 16, "yFt": 18 }
+      ]
+    },
+    {
+      "id": "space-l3-west",
+      "levelId": "level-3",
+      "name": "Level 3 Apartment West",
+      "footprint": [
+        { "xFt": 0, "yFt": 2 },
+        { "xFt": 12, "yFt": 0 },
+        { "xFt": 18, "yFt": 6 },
+        { "xFt": 16, "yFt": 18 },
+        { "xFt": 4, "yFt": 16 }
+      ]
+    },
+    {
+      "id": "space-l3-east",
+      "levelId": "level-3",
+      "name": "Level 3 Apartment East",
+      "footprint": [
+        { "xFt": 18, "yFt": 6 },
+        { "xFt": 30, "yFt": 3 },
+        { "xFt": 36, "yFt": 12 },
+        { "xFt": 32, "yFt": 22 },
+        { "xFt": 16, "yFt": 18 }
+      ]
+    }
+  ]
+}

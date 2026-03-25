@@ -1,4 +1,4 @@
-import { useEffect, useState, type KeyboardEvent } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent as ReactPointerEvent } from "react";
 import { logout, useAuth } from "./auth";
 import {
   autoGenerateLevels,
@@ -8,6 +8,8 @@ import {
   getLevelById,
   getLevelSpaces,
   getSpaceAreaSqFt,
+  getSpaceBoundsFt,
+  getSpaceLabelPointFt,
   getValidActiveLevelId,
   moveLevel,
   renameLevel,
@@ -19,13 +21,36 @@ import {
   type Space
 } from "./project-doc";
 import { formatFeetAndInches, parseFeetAndInches } from "./units";
-import { useUiStore, type Selection, type ToolMode, type ViewMode } from "./ui-store";
+import {
+  getSelectionSpaceIds,
+  hasSelectionSpace,
+  useUiStore,
+  type SelectMode,
+  type Selection,
+  type ViewMode
+} from "./ui-store";
+import TestDashboard from "./test-dashboard";
+import {
+  LEVEL_CASES,
+  MIXED_CASES,
+  SPACE_CASES,
+  cloneSampleProjectDoc,
+  type SampleCaseManifest
+} from "./test-cases";
+import ThreeDViewport from "./three-d-viewport";
 import UnitsInspector from "./units-inspector";
 
-const toolItems: Array<{ value: ToolMode; label: string; hint: string }> = [
-  { value: "select", label: "Select", hint: "Inspect model items" },
-  { value: "space", label: "Space", hint: "Author room-like areas" },
-  { value: "level", label: "Level", hint: "Manage vertical datums" }
+const selectModeItems: Array<{ value: SelectMode; label: string; hint: string }> = [
+  {
+    value: "pick-many",
+    label: "Pick Many",
+    hint: "Click spaces to add them. Click a selected space again to remove it."
+  },
+  {
+    value: "sweep",
+    label: "Sweep Select",
+    hint: "Drag to replace. Hold Shift to add more. Hold Alt to remove from the current set."
+  }
 ];
 
 const ribbonGroups = [
@@ -47,6 +72,17 @@ type EditorState = {
   activeLevelId: string;
 };
 
+type SweepMode = "replace" | "add" | "remove";
+
+type SweepSelectionDraft = {
+  pointerId: number;
+  startX: number;
+  startY: number;
+  currentX: number;
+  currentY: number;
+  mode: SweepMode;
+};
+
 type LevelManagerProps = {
   project: ProjectDoc;
   activeLevelId: string;
@@ -65,8 +101,12 @@ function getViewSelection(view: ViewMode): Selection {
   return { kind: "view", id: view === "3d" ? "view-3d" : "view-plan" };
 }
 
-function getToolLabel(tool: ToolMode): string {
-  return toolItems.find((item) => item.value === tool)?.label ?? "Select";
+function getSelectModeLabel(mode: SelectMode): string {
+  return selectModeItems.find((item) => item.value === mode)?.label ?? "Pick Many";
+}
+
+function getSelectModeHint(mode: SelectMode): string {
+  return selectModeItems.find((item) => item.value === mode)?.hint ?? selectModeItems[0].hint;
 }
 
 function getViewLabel(view: ViewMode, level: Level): string {
@@ -77,15 +117,19 @@ function getSelectionLabel(
   selection: Selection,
   activeLevel: Level,
   selectedLevel: Level | null,
-  selectedSpace: Space | null,
+  selectedSpaces: Space[],
   view: ViewMode
 ): string {
   if (!selection) {
     return "None";
   }
 
-  if (selection.kind === "space" && selectedSpace) {
-    return selectedSpace.name;
+  if (selection.kind === "space" && selectedSpaces[0]) {
+    return selectedSpaces[0].name;
+  }
+
+  if (selection.kind === "space-set" && selectedSpaces.length > 0) {
+    return `${selectedSpaces.length} spaces`;
   }
 
   if (selection.kind === "level" && selectedLevel) {
@@ -102,10 +146,10 @@ function getPlanBounds(spaces: Space[]): PlanBounds {
 
   const bounds = spaces.reduce(
     (currentBounds, space) => ({
-      minX: Math.min(currentBounds.minX, space.xFt),
-      minY: Math.min(currentBounds.minY, space.yFt),
-      maxX: Math.max(currentBounds.maxX, space.xFt + space.widthFt),
-      maxY: Math.max(currentBounds.maxY, space.yFt + space.depthFt)
+      minX: Math.min(currentBounds.minX, getSpaceBoundsFt(space).minXFt),
+      minY: Math.min(currentBounds.minY, getSpaceBoundsFt(space).minYFt),
+      maxX: Math.max(currentBounds.maxX, getSpaceBoundsFt(space).maxXFt),
+      maxY: Math.max(currentBounds.maxY, getSpaceBoundsFt(space).maxYFt)
     }),
     {
       minX: Number.POSITIVE_INFINITY,
@@ -115,12 +159,119 @@ function getPlanBounds(spaces: Space[]): PlanBounds {
     }
   );
 
+  const originX = Math.min(bounds.minX, 0);
+  const originY = Math.min(bounds.minY, 0);
+
   return {
-    minX: bounds.minX,
-    minY: bounds.minY,
-    width: bounds.maxX - bounds.minX,
-    height: bounds.maxY - bounds.minY
+    minX: originX,
+    minY: originY,
+    width: bounds.maxX - originX,
+    height: bounds.maxY - originY
   };
+}
+
+function getPlanPolygonPoints(space: Space, bounds: PlanBounds): string {
+  return space.footprint
+    .map((point) => `${(point.xFt - bounds.minX) * planScalePx},${(point.yFt - bounds.minY) * planScalePx}`)
+    .join(" ");
+}
+
+function getPlanLabelPosition(space: Space, bounds: PlanBounds): { x: number; y: number } {
+  const labelPoint = getSpaceLabelPointFt(space);
+
+  return {
+    x: (labelPoint.xFt - bounds.minX) * planScalePx,
+    y: (labelPoint.yFt - bounds.minY) * planScalePx
+  };
+}
+
+function normalizeSpaceSelection(ids: string[], fallback: Selection): Selection {
+  const uniqueIds = [...new Set(ids)];
+
+  if (uniqueIds.length === 0) {
+    return fallback;
+  }
+
+  if (uniqueIds.length === 1) {
+    return { kind: "space", id: uniqueIds[0] };
+  }
+
+  return { kind: "space-set", ids: uniqueIds };
+}
+
+function toggleSpaceSelection(selection: Selection, spaceId: string, fallback: Selection): Selection {
+  const currentIds = getSelectionSpaceIds(selection);
+  const nextIds = currentIds.includes(spaceId)
+    ? currentIds.filter((id) => id !== spaceId)
+    : [...currentIds, spaceId];
+
+  return normalizeSpaceSelection(nextIds, fallback);
+}
+
+function getSweepMode(event: ReactPointerEvent<HTMLElement>): SweepMode {
+  if (event.altKey) {
+    return "remove";
+  }
+
+  if (event.shiftKey) {
+    return "add";
+  }
+
+  return "replace";
+}
+
+function getSweepSelectionBounds(draft: SweepSelectionDraft) {
+  const left = Math.min(draft.startX, draft.currentX);
+  const right = Math.max(draft.startX, draft.currentX);
+  const top = Math.min(draft.startY, draft.currentY);
+  const bottom = Math.max(draft.startY, draft.currentY);
+
+  return {
+    left,
+    right,
+    top,
+    bottom,
+    width: right - left,
+    height: bottom - top
+  };
+}
+
+function getSweptSpaceIds(spaces: Space[], bounds: PlanBounds, selectionBounds: ReturnType<typeof getSweepSelectionBounds>): string[] {
+  return spaces
+    .filter((space) => {
+      const spaceBounds = getSpaceBoundsFt(space);
+      const left = (spaceBounds.minXFt - bounds.minX) * planScalePx;
+      const top = (spaceBounds.minYFt - bounds.minY) * planScalePx;
+      const right = left + spaceBounds.widthFt * planScalePx;
+      const bottom = top + spaceBounds.depthFt * planScalePx;
+
+      return !(
+        right < selectionBounds.left
+        || left > selectionBounds.right
+        || bottom < selectionBounds.top
+        || top > selectionBounds.bottom
+      );
+    })
+    .map((space) => space.id);
+}
+
+function mergeSpaceSelection(
+  selection: Selection,
+  nextSpaceIds: string[],
+  mode: SweepMode,
+  fallback: Selection
+): Selection {
+  const currentIds = getSelectionSpaceIds(selection);
+
+  if (mode === "replace") {
+    return normalizeSpaceSelection(nextSpaceIds, fallback);
+  }
+
+  if (mode === "add") {
+    return normalizeSpaceSelection([...currentIds, ...nextSpaceIds], fallback);
+  }
+
+  return normalizeSpaceSelection(currentIds.filter((id) => !nextSpaceIds.includes(id)), fallback);
 }
 
 function getInitialStoryCounts(project: ProjectDoc): { belowGrade: number; onGrade: number } {
@@ -397,9 +548,9 @@ function LevelManager({
 export default function EditorShell() {
   const auth = useAuth();
   const activeView = useUiStore((state) => state.activeView);
-  const activeTool = useUiStore((state) => state.activeTool);
+  const selectMode = useUiStore((state) => state.selectMode);
   const selection = useUiStore((state) => state.selection);
-  const setActiveTool = useUiStore((state) => state.setActiveTool);
+  const setSelectMode = useUiStore((state) => state.setSelectMode);
   const setActiveView = useUiStore((state) => state.setActiveView);
   const setSelection = useUiStore((state) => state.setSelection);
   const [editorState, setEditorState] = useState<EditorState>(() => {
@@ -411,20 +562,35 @@ export default function EditorShell() {
   const [logoutError, setLogoutError] = useState<string | null>(null);
   const [showUnitsInspector, setShowUnitsInspector] = useState(false);
   const [showLevelManager, setShowLevelManager] = useState(false);
+  const [showTestDashboard, setShowTestDashboard] = useState(false);
+  const [activeSampleCaseId, setActiveSampleCaseId] = useState<string | null>(null);
+  const [showSelectMenu, setShowSelectMenu] = useState(false);
+  const [sweepDraft, setSweepDraft] = useState<SweepSelectionDraft | null>(null);
+  const selectMenuRef = useRef<HTMLDivElement | null>(null);
+  const workspaceRef = useRef<HTMLElement | null>(null);
   const project = editorState.project;
   const activeLevelId = getValidActiveLevelId(project, editorState.activeLevelId);
   const activeLevel = getLevelById(project, activeLevelId) ?? project.levels[0];
-  const selectedSpace = selection?.kind === "space"
-    ? project.spaces.find((space) => space.id === selection.id) ?? null
-    : null;
+  const selectedSpaceIds = getSelectionSpaceIds(selection);
+  const selectedSpaces = selectedSpaceIds.flatMap((spaceId) => {
+    const space = project.spaces.find((candidate) => candidate.id === spaceId);
+    return space ? [space] : [];
+  });
+  const selectedSpace = selection?.kind === "space" ? selectedSpaces[0] ?? null : null;
   const selectedLevel = selection?.kind === "level" ? getLevelById(project, selection.id) : null;
   const activeSpaces = activeLevel ? getLevelSpaces(project, activeLevel.id) : [];
   const grossArea = project.spaces.reduce((total, space) => total + getSpaceAreaSqFt(space), 0);
   const currentViewLabel = activeLevel ? getViewLabel(activeView, activeLevel) : "3D View";
   const selectionLabel = activeLevel
-    ? getSelectionLabel(selection, activeLevel, selectedLevel, selectedSpace, activeView)
+    ? getSelectionLabel(selection, activeLevel, selectedLevel, selectedSpaces, activeView)
     : "None";
   const userEmail = auth.user?.email ?? "Signed in";
+  const planBounds = getPlanBounds(activeSpaces);
+  const planWidth = planBounds.width * planScalePx;
+  const planHeight = planBounds.height * planScalePx;
+  const sweepSelectionBounds = sweepDraft ? getSweepSelectionBounds(sweepDraft) : null;
+  const selectionAreaSqFt = selectedSpaces.reduce((total, space) => total + getSpaceAreaSqFt(space), 0);
+  const selectedSpaceBounds = selectedSpace ? getSpaceBoundsFt(selectedSpace) : null;
 
   useEffect(() => {
     if (activeLevelId !== editorState.activeLevelId) {
@@ -435,6 +601,21 @@ export default function EditorShell() {
       ));
     }
   }, [activeLevelId, editorState.activeLevelId]);
+
+  useEffect(() => {
+    const handlePointerDown = (event: PointerEvent) => {
+      const container = selectMenuRef.current;
+
+      if (!container || container.contains(event.target as Node)) {
+        return;
+      }
+
+      setShowSelectMenu(false);
+    };
+
+    window.addEventListener("pointerdown", handlePointerDown);
+    return () => window.removeEventListener("pointerdown", handlePointerDown);
+  }, []);
 
   useEffect(() => {
     if (!selection || !activeLevel) {
@@ -452,6 +633,19 @@ export default function EditorShell() {
       if (!space || space.levelId !== activeLevel.id) {
         setSelection(getViewSelection(activeView));
       }
+
+      return;
+    }
+
+    if (selection.kind === "space-set") {
+      const visibleSpaceIds = selection.ids.filter((spaceId) => {
+        const space = project.spaces.find((item) => item.id === spaceId);
+        return Boolean(space && space.levelId === activeLevel.id);
+      });
+
+      if (visibleSpaceIds.length !== selection.ids.length) {
+        setSelection(normalizeSpaceSelection(visibleSpaceIds, getViewSelection(activeView)));
+      }
     }
   }, [activeLevel, activeView, project, selection, setSelection]);
 
@@ -460,7 +654,7 @@ export default function EditorShell() {
   }
 
   const sessionRows = [
-    ["Tool", getToolLabel(activeTool)],
+    ["Select mode", getSelectModeLabel(selectMode)],
     ["View", currentViewLabel],
     ["Active level", activeLevel.name],
     ["Default height", formatFeetAndInches(project.defaultStoryHeightFt)],
@@ -472,9 +666,18 @@ export default function EditorShell() {
         ["Type", "Space"],
         ["Name", selectedSpace.name],
         ["Area", `${getSpaceAreaSqFt(selectedSpace)} sf`],
-        ["Width", formatFeetAndInches(selectedSpace.widthFt)],
-        ["Depth", formatFeetAndInches(selectedSpace.depthFt)]
+        ["Points", String(selectedSpace.footprint.length)],
+        ["Bounds width", selectedSpaceBounds ? formatFeetAndInches(selectedSpaceBounds.widthFt) : "0\""],
+        ["Bounds depth", selectedSpaceBounds ? formatFeetAndInches(selectedSpaceBounds.depthFt) : "0\""]
       ]
+    : selection?.kind === "space-set" && selectedSpaces.length > 0
+      ? [
+          ["Type", "Multi-space"],
+          ["Count", String(selectedSpaces.length)],
+          ["Area", `${selectionAreaSqFt} sf`],
+          ["Select mode", getSelectModeLabel(selectMode)],
+          ["Clear", "Select > Clear Selection"]
+        ]
     : selection?.kind === "level" && selectedLevel
       ? [
           ["Type", "Level"],
@@ -488,22 +691,115 @@ export default function EditorShell() {
             ["Type", "View"],
             ["Name", currentViewLabel],
             ["Mode", activeView === "3d" ? "Perspective" : "Plan"],
-            ["Selection", selectionLabel]
+            ["Select mode", getSelectModeLabel(selectMode)]
           ]
         : [["Selection", "No selection"]];
-
-  const planBounds = getPlanBounds(activeSpaces);
-  const planWidth = planBounds.width * planScalePx;
-  const planHeight = planBounds.height * planScalePx;
   const viewItems: Array<{ id: "view-3d" | "view-plan"; label: string; view: ViewMode }> = [
     { id: "view-3d", label: "3D View", view: "3d" },
     { id: "view-plan", label: `${activeLevel.name} Floor Plan`, view: "plan" }
   ];
-  const visibleSpaceNames = activeSpaces.map((space) => space.name).join(", ");
 
   const showView = (view: ViewMode) => {
     setActiveView(view);
     setSelection(getViewSelection(view));
+  };
+
+  const handleSelectModeChange = (mode: SelectMode) => {
+    setSelectMode(mode);
+    setShowSelectMenu(false);
+  };
+
+  const handleClearSelection = () => {
+    setSelection(getViewSelection(activeView));
+    setShowSelectMenu(false);
+  };
+
+  const handleSelectAllVisible = () => {
+    setActiveView("plan");
+    setSelection(normalizeSpaceSelection(activeSpaces.map((space) => space.id), getViewSelection("plan")));
+    setShowSelectMenu(false);
+  };
+
+  const handlePlanSpaceSelection = (spaceId: string) => {
+    setActiveView("plan");
+    setSelection(toggleSpaceSelection(selection, spaceId, getViewSelection("plan")));
+  };
+
+  const handleBrowserSpaceSelection = (spaceId: string) => {
+    if (activeView !== "3d") {
+      setActiveView("plan");
+    }
+
+    if (selectMode === "pick-many") {
+      setSelection(toggleSpaceSelection(selection, spaceId, getViewSelection(activeView)));
+      return;
+    }
+
+    setSelection({ kind: "space", id: spaceId });
+  };
+
+  const handlePlanCanvasPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (selectMode !== "sweep" || event.button !== 0) {
+      return;
+    }
+
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const x = event.clientX - bounds.left;
+    const y = event.clientY - bounds.top;
+
+    setSweepDraft({
+      pointerId: event.pointerId,
+      startX: x,
+      startY: y,
+      currentX: x,
+      currentY: y,
+      mode: getSweepMode(event)
+    });
+
+    event.currentTarget.setPointerCapture(event.pointerId);
+    event.preventDefault();
+  };
+
+  const handlePlanCanvasPointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
+    setSweepDraft((current) => {
+      if (!current || current.pointerId !== event.pointerId) {
+        return current;
+      }
+
+      const bounds = event.currentTarget.getBoundingClientRect();
+
+      return {
+        ...current,
+        currentX: event.clientX - bounds.left,
+        currentY: event.clientY - bounds.top
+      };
+    });
+  };
+
+  const handlePlanCanvasPointerEnd = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const currentDraft = sweepDraft;
+
+    if (!currentDraft || currentDraft.pointerId !== event.pointerId) {
+      return;
+    }
+
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const completedDraft: SweepSelectionDraft = {
+      ...currentDraft,
+      currentX: event.clientX - bounds.left,
+      currentY: event.clientY - bounds.top
+    };
+    const sweptSpaceIds = getSweptSpaceIds(activeSpaces, planBounds, getSweepSelectionBounds(completedDraft));
+
+    setActiveView("plan");
+    setSelection(mergeSpaceSelection(selection, sweptSpaceIds, completedDraft.mode, getViewSelection("plan")));
+    setSweepDraft(null);
+
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+
+    event.preventDefault();
   };
 
   const setActiveLevel = (levelId: string) => {
@@ -524,6 +820,8 @@ export default function EditorShell() {
     if (createdLevelId) {
       setSelection({ kind: "level", id: createdLevelId });
     }
+
+    setActiveSampleCaseId(null);
   };
 
   const handleDeleteLevel = (levelId: string) => {
@@ -538,6 +836,8 @@ export default function EditorShell() {
     if (nextActiveLevelId) {
       setSelection({ kind: "level", id: nextActiveLevelId });
     }
+
+    setActiveSampleCaseId(null);
   };
 
   const handleRenameLevel = (levelId: string, name: string) => {
@@ -545,6 +845,7 @@ export default function EditorShell() {
       const nextProject = renameLevel(current.project, levelId, name);
       return { project: nextProject, activeLevelId: getValidActiveLevelId(nextProject, current.activeLevelId) };
     });
+    setActiveSampleCaseId(null);
   };
 
   const handleMoveLevel = (levelId: string, direction: "up" | "down") => {
@@ -552,6 +853,7 @@ export default function EditorShell() {
       const nextProject = moveLevel(current.project, levelId, direction);
       return { project: nextProject, activeLevelId: getValidActiveLevelId(nextProject, current.activeLevelId) };
     });
+    setActiveSampleCaseId(null);
   };
 
   const handleSetLevelElevation = (levelId: string, elevationFt: number) => {
@@ -559,6 +861,7 @@ export default function EditorShell() {
       const nextProject = setLevelElevation(current.project, levelId, elevationFt);
       return { project: nextProject, activeLevelId: getValidActiveLevelId(nextProject, current.activeLevelId) };
     });
+    setActiveSampleCaseId(null);
   };
 
   const handleSetDefaultStoryHeight = (heightFt: number) => {
@@ -566,6 +869,7 @@ export default function EditorShell() {
       const nextProject = setDefaultStoryHeight(current.project, heightFt);
       return { project: nextProject, activeLevelId: getValidActiveLevelId(nextProject, current.activeLevelId) };
     });
+    setActiveSampleCaseId(null);
   };
 
   const handleAutoGenerateLevels = (input: AutoGenerateLevelsInput) => {
@@ -580,6 +884,24 @@ export default function EditorShell() {
     if (nextActiveLevelId) {
       setSelection({ kind: "level", id: nextActiveLevelId });
     }
+
+    setActiveSampleCaseId(null);
+  };
+
+  const handleLoadSampleCase = (sampleCase: SampleCaseManifest) => {
+    const projectDoc = cloneSampleProjectDoc(sampleCase.doc);
+    const nextActiveLevelId = getValidActiveLevelId(projectDoc, sampleCase.preferredActiveLevelId);
+
+    setEditorState({
+      project: projectDoc,
+      activeLevelId: nextActiveLevelId
+    });
+    setActiveView(sampleCase.preferredView);
+    setSelection(sampleCase.preferredView === "plan"
+      ? { kind: "level", id: nextActiveLevelId }
+      : getViewSelection(sampleCase.preferredView));
+    setActiveSampleCaseId(sampleCase.id);
+    setShowSelectMenu(false);
   };
 
   const handleLogout = async () => {
@@ -639,8 +961,63 @@ export default function EditorShell() {
             <span className="ribbon-group-label">View</span>
           </section>
 
+          <section className="ribbon-group ribbon-group-select">
+            <div ref={selectMenuRef} className="select-menu">
+              <button
+                type="button"
+                className={`ribbon-button ${showSelectMenu ? "is-active" : ""}`}
+                aria-expanded={showSelectMenu}
+                onClick={() => setShowSelectMenu((current) => !current)}
+              >
+                Select
+              </button>
+              <span className="select-menu-summary">{getSelectModeLabel(selectMode)}</span>
+
+              {showSelectMenu ? (
+                <div className="select-menu-panel" role="menu" aria-label="Select tools">
+                  <div className="select-menu-section">
+                    {selectModeItems.map((item) => (
+                      <button
+                        key={item.value}
+                        type="button"
+                        className={`select-menu-item ${selectMode === item.value ? "is-active" : ""}`}
+                        onClick={() => handleSelectModeChange(item.value)}
+                      >
+                        <strong>{item.label}</strong>
+                        <span>{item.hint}</span>
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="select-menu-divider" />
+
+                  <div className="select-menu-section">
+                    <button type="button" className="select-menu-item" onClick={handleSelectAllVisible}>
+                      <strong>Select All Visible</strong>
+                      <span>Select every visible space on the active plan. Clear Selection removes them all.</span>
+                    </button>
+
+                    <button type="button" className="select-menu-item" onClick={handleClearSelection}>
+                      <strong>Clear Selection</strong>
+                      <span>Drop the current selection set and return focus to the current view.</span>
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+            </div>
+            <span className="ribbon-group-label">Select</span>
+          </section>
+
           <section className="ribbon-group ribbon-group-utility">
             <div className="ribbon-buttons">
+              <button
+                type="button"
+                className={`ribbon-button ${showTestDashboard ? "is-active" : ""}`}
+                aria-pressed={showTestDashboard}
+                onClick={() => setShowTestDashboard((current) => !current)}
+              >
+                Test
+              </button>
               <button
                 type="button"
                 className={`ribbon-button ${showLevelManager ? "is-active" : ""}`}
@@ -685,3 +1062,237 @@ export default function EditorShell() {
       </header>
 
       <div className="main-shell">
+        <aside className="sidebar sidebar-left">
+          <section className="properties-panel">
+            <div className="panel-title-row">
+              <h2>Properties</h2>
+              <span>{selectionLabel}</span>
+            </div>
+
+            <section className="property-group">
+              <h3>Session</h3>
+              <dl className="property-list">
+                {sessionRows.map(([label, value]) => (
+                  <div key={label}>
+                    <dt>{label}</dt>
+                    <dd>{value}</dd>
+                  </div>
+                ))}
+              </dl>
+            </section>
+
+            <section className="property-group">
+              <h3>Selection</h3>
+              <dl className="property-list">
+                {selectionRows.map(([label, value]) => (
+                  <div key={label}>
+                    <dt>{label}</dt>
+                    <dd>{value}</dd>
+                  </div>
+                ))}
+              </dl>
+            </section>
+          </section>
+        </aside>
+
+        <section ref={workspaceRef} className="workspace-shell">
+          <header className="view-tabs" aria-label="Workspace views">
+            {viewItems.map((viewItem) => (
+              <button
+                key={viewItem.id}
+                type="button"
+                className={`view-tab ${activeView === viewItem.view ? "is-active" : ""}`}
+                aria-pressed={activeView === viewItem.view}
+                onClick={() => showView(viewItem.view)}
+              >
+                {viewItem.label}
+              </button>
+            ))}
+          </header>
+
+          <section className="viewport-shell">
+            {activeView === "3d" ? (
+              <ThreeDViewport
+                project={project}
+                activeLevelId={activeLevel.id}
+                activeLevelName={activeLevel.name}
+                selection={selection}
+                selectionLabel={selectionLabel}
+              />
+            ) : (
+              <div className="viewport viewport-plan">
+                <div className="plan-canvas-wrap">
+                  <div
+                    className={`plan-canvas ${selectMode === "sweep" ? "is-sweep-mode" : ""}`}
+                    style={{ width: planWidth, height: planHeight }}
+                    onPointerDown={handlePlanCanvasPointerDown}
+                    onPointerMove={handlePlanCanvasPointerMove}
+                    onPointerUp={handlePlanCanvasPointerEnd}
+                    onPointerCancel={handlePlanCanvasPointerEnd}
+                  >
+                    <svg
+                      className="plan-svg"
+                      width={Math.max(planWidth, 1)}
+                      height={Math.max(planHeight, 1)}
+                      viewBox={`0 0 ${Math.max(planWidth, 1)} ${Math.max(planHeight, 1)}`}
+                    >
+                      {activeSpaces.map((space) => {
+                        const labelPoint = getPlanLabelPosition(space, planBounds);
+
+                        return (
+                          <g
+                            key={space.id}
+                            className={`plan-space ${hasSelectionSpace(selection, space.id) ? "is-active" : ""}`}
+                            role="button"
+                            tabIndex={0}
+                            onClick={(event) => {
+                              if (selectMode === "sweep") {
+                                event.preventDefault();
+                                return;
+                              }
+
+                              handlePlanSpaceSelection(space.id);
+                            }}
+                            onKeyDown={(event) => {
+                              if (event.key === "Enter" || event.key === " ") {
+                                event.preventDefault();
+                                handlePlanSpaceSelection(space.id);
+                              }
+                            }}
+                          >
+                            <polygon
+                              className="plan-space-shape"
+                              points={getPlanPolygonPoints(space, planBounds)}
+                            />
+                            <text className="plan-space-label" x={labelPoint.x} y={labelPoint.y - 4} textAnchor="middle">
+                              {space.name}
+                            </text>
+                            <text className="plan-space-metrics" x={labelPoint.x} y={labelPoint.y + 10} textAnchor="middle">
+                              {getSpaceAreaSqFt(space)} sf
+                            </text>
+                          </g>
+                        );
+                      })}
+                    </svg>
+
+                    {sweepSelectionBounds ? (
+                      <div
+                        className={`plan-sweep-box is-${sweepDraft?.mode ?? "replace"}`}
+                        style={{
+                          left: sweepSelectionBounds.left,
+                          top: sweepSelectionBounds.top,
+                          width: sweepSelectionBounds.width,
+                          height: sweepSelectionBounds.height
+                        }}
+                      />
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+            )}
+            {showLevelManager ? (
+              <LevelManager
+                project={project}
+                activeLevelId={activeLevel.id}
+                onClose={() => setShowLevelManager(false)}
+                onActivateLevel={setActiveLevel}
+                onCreateLevel={handleCreateLevel}
+                onDeleteLevel={handleDeleteLevel}
+                onRenameLevel={handleRenameLevel}
+                onMoveLevel={handleMoveLevel}
+                onSetLevelElevation={handleSetLevelElevation}
+                onSetDefaultStoryHeight={handleSetDefaultStoryHeight}
+                onAutoGenerate={handleAutoGenerateLevels}
+              />
+            ) : null}
+
+            {showTestDashboard ? (
+              <TestDashboard
+                workspaceRef={workspaceRef}
+                levelCases={LEVEL_CASES}
+                spaceCases={SPACE_CASES}
+                mixedCases={MIXED_CASES}
+                activeCaseId={activeSampleCaseId}
+                onLoadCase={handleLoadSampleCase}
+                onClose={() => setShowTestDashboard(false)}
+              />
+            ) : null}
+
+            <UnitsInspector open={showUnitsInspector} onClose={() => setShowUnitsInspector(false)} />
+          </section>
+        </section>
+
+        <aside className="sidebar sidebar-right">
+          <section className="project-browser">
+            <div className="panel-title-row">
+              <h2>Project Browser</h2>
+              <span>{activeLevel.name}</span>
+            </div>
+
+            <section className="browser-group">
+              <h3>Views</h3>
+              <div className="browser-list">
+                {viewItems.map((viewItem) => (
+                  <button
+                    key={viewItem.id}
+                    type="button"
+                    className={`browser-row ${selection?.kind === "view" && selection.id === viewItem.id ? "is-active" : ""}`}
+                    onClick={() => showView(viewItem.view)}
+                  >
+                    <span className="browser-row-kind">View</span>
+                    <span>{viewItem.label}</span>
+                  </button>
+                ))}
+              </div>
+            </section>
+
+            <section className="browser-group">
+              <h3>Levels</h3>
+              <div className="browser-list">
+                {project.levels.map((level) => (
+                  <button
+                    key={level.id}
+                    type="button"
+                    className={`browser-row ${activeLevel.id === level.id ? "is-active" : ""}`}
+                    onClick={() => setActiveLevel(level.id)}
+                  >
+                    <span className="browser-row-kind">Level</span>
+                    <span>{level.name}</span>
+                  </button>
+                ))}
+              </div>
+            </section>
+
+            <section className="browser-group">
+              <h3>Spaces</h3>
+              <div className="browser-list">
+                {activeSpaces.map((space) => (
+                  <button
+                    key={space.id}
+                    type="button"
+                    className={`browser-row ${hasSelectionSpace(selection, space.id) ? "is-active" : ""}`}
+                    onClick={() => handleBrowserSpaceSelection(space.id)}
+                  >
+                    <span className="browser-row-kind">Space</span>
+                    <span>{space.name}</span>
+                  </button>
+                ))}
+              </div>
+            </section>
+          </section>
+        </aside>
+      </div>
+
+      <footer className="status-bar">
+        <span>Units: Imperial ft-in</span>
+        <span>Active level: {activeLevel.name}</span>
+        <span>Visible spaces: {activeSpaces.length}</span>
+        <span>View: {currentViewLabel}</span>
+        <span>Select: {getSelectModeLabel(selectMode)}</span>
+        <span>Hint: {getSelectModeHint(selectMode)}</span>
+        <span>Case: {activeSampleCaseId ?? "Local"}</span>
+        <span>Selection: {selectionLabel}</span>
+      </footer>
+    </main>
+  );
+}

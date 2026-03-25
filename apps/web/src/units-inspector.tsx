@@ -5,6 +5,7 @@ import {
   getAreaSqFt,
   metersToFeet,
   parseFeetAndInches,
+  type DefaultLengthUnit,
   type InchDenominator
 } from "./units";
 
@@ -14,6 +15,9 @@ type UnitsInspectorProps = {
 };
 
 const sampleInputs = [
+  "1.24",
+  "1.2\"",
+  "1.2''",
   "12'",
   "12'6\"",
   "12' 6\"",
@@ -45,7 +49,8 @@ function formatNumber(value: number, maximumFractionDigits = 6): string {
 }
 
 export default function UnitsInspector({ open, onClose }: UnitsInspectorProps) {
-  const [parseInput, setParseInput] = useState("12 3 3/4");
+  const [parseInput, setParseInput] = useState("1.24");
+  const [defaultUnit, setDefaultUnit] = useState<DefaultLengthUnit>("ft");
   const [feetInput, setFeetInput] = useState("12.5");
   const [inchDenominator, setInchDenominator] = useState<InchDenominator>(16);
   const [metersInput, setMetersInput] = useState("3.048");
@@ -56,7 +61,7 @@ export default function UnitsInspector({ open, onClose }: UnitsInspectorProps) {
     return null;
   }
 
-  const parsedFeet = parseFeetAndInches(parseInput);
+  const parsedFeet = parseFeetAndInches(parseInput, { defaultUnit });
   const parsedMeters = parsedFeet === null ? null : feetToMeters(parsedFeet);
   const parsedNormalized = parsedFeet === null ? null : formatFeetAndInches(parsedFeet, { inchDenominator });
 
@@ -104,6 +109,17 @@ export default function UnitsInspector({ open, onClose }: UnitsInspectorProps) {
           />
         </label>
 
+        <label className="units-inspector-field">
+          <span>Bare number unit</span>
+          <select
+            value={defaultUnit}
+            onChange={(event) => setDefaultUnit(event.target.value as DefaultLengthUnit)}
+          >
+            <option value="ft">Feet</option>
+            <option value="in">Inches</option>
+          </select>
+        </label>
+
         <div className="units-sample-row" aria-label="Sample unit inputs">
           {sampleInputs.map((sample) => (
             <button
@@ -118,9 +134,19 @@ export default function UnitsInspector({ open, onClose }: UnitsInspectorProps) {
         </div>
 
         <p className="units-inspector-note">
+          Bare single numbers use the selected default unit.
+          {" "}
           <code>''</code>
           {" "}
-          is treated as inches. Markerless shorthand like
+          is treated as inches, and explicit
+          {" "}
+          <code>'</code>
+          {" "}
+          or
+          {" "}
+          <code>"</code>
+          {" "}
+          markers still win over the default. Markerless shorthand like
           {" "}
           <code>12 3 3/4</code>
           {" "}

@@ -1,6 +1,20 @@
-import { getAreaSqFt } from "./units";
-
 export const DEFAULT_STORY_HEIGHT_FT = 10;
+
+const GEOMETRY_EPSILON = 1e-6;
+
+export type Point2Ft = {
+  xFt: number;
+  yFt: number;
+};
+
+export type PolygonBoundsFt = {
+  minXFt: number;
+  minYFt: number;
+  maxXFt: number;
+  maxYFt: number;
+  widthFt: number;
+  depthFt: number;
+};
 
 export type Level = {
   id: string;
@@ -13,10 +27,7 @@ export type Space = {
   id: string;
   levelId: string;
   name: string;
-  xFt: number;
-  yFt: number;
-  widthFt: number;
-  depthFt: number;
+  footprint: Point2Ft[];
 };
 
 export type ProjectDoc = {
@@ -135,6 +146,219 @@ function getPreferredGeneratedLevelName(levels: GeneratedLevelSpec[]): string {
     ?? "Level 1";
 }
 
+function pointsMatch(left: Point2Ft, right: Point2Ft): boolean {
+  return Math.abs(left.xFt - right.xFt) <= GEOMETRY_EPSILON
+    && Math.abs(left.yFt - right.yFt) <= GEOMETRY_EPSILON;
+}
+
+export function createRectangleFootprint(xFt: number, yFt: number, widthFt: number, depthFt: number): Point2Ft[] {
+  return [
+    { xFt, yFt },
+    { xFt: xFt + widthFt, yFt },
+    { xFt: xFt + widthFt, yFt: yFt + depthFt },
+    { xFt, yFt: yFt + depthFt }
+  ];
+}
+
+export function normalizeFootprint(footprint: Point2Ft[]): Point2Ft[] {
+  const normalizedPoints: Point2Ft[] = [];
+
+  for (const point of footprint) {
+    if (!Number.isFinite(point.xFt) || !Number.isFinite(point.yFt)) {
+      continue;
+    }
+
+    if (normalizedPoints.length > 0 && pointsMatch(normalizedPoints[normalizedPoints.length - 1], point)) {
+      continue;
+    }
+
+    normalizedPoints.push({ xFt: point.xFt, yFt: point.yFt });
+  }
+
+  if (normalizedPoints.length >= 2 && pointsMatch(normalizedPoints[0], normalizedPoints[normalizedPoints.length - 1])) {
+    normalizedPoints.pop();
+  }
+
+  return normalizedPoints;
+}
+
+export function getPolygonSignedAreaSqFt(footprint: Point2Ft[]): number {
+  const normalizedPoints = normalizeFootprint(footprint);
+
+  if (normalizedPoints.length < 3) {
+    return 0;
+  }
+
+  let doubleArea = 0;
+
+  for (let index = 0; index < normalizedPoints.length; index += 1) {
+    const current = normalizedPoints[index];
+    const next = normalizedPoints[(index + 1) % normalizedPoints.length];
+    doubleArea += current.xFt * next.yFt - next.xFt * current.yFt;
+  }
+
+  return doubleArea / 2;
+}
+
+export function getPolygonAreaSqFt(footprint: Point2Ft[]): number {
+  return Math.abs(getPolygonSignedAreaSqFt(footprint));
+}
+
+export function getPolygonBoundsFt(footprint: Point2Ft[]): PolygonBoundsFt {
+  const normalizedPoints = normalizeFootprint(footprint);
+
+  if (normalizedPoints.length === 0) {
+    return {
+      minXFt: 0,
+      minYFt: 0,
+      maxXFt: 0,
+      maxYFt: 0,
+      widthFt: 0,
+      depthFt: 0
+    };
+  }
+
+  const bounds = normalizedPoints.reduce(
+    (currentBounds, point) => ({
+      minXFt: Math.min(currentBounds.minXFt, point.xFt),
+      minYFt: Math.min(currentBounds.minYFt, point.yFt),
+      maxXFt: Math.max(currentBounds.maxXFt, point.xFt),
+      maxYFt: Math.max(currentBounds.maxYFt, point.yFt)
+    }),
+    {
+      minXFt: Number.POSITIVE_INFINITY,
+      minYFt: Number.POSITIVE_INFINITY,
+      maxXFt: Number.NEGATIVE_INFINITY,
+      maxYFt: Number.NEGATIVE_INFINITY
+    }
+  );
+
+  return {
+    ...bounds,
+    widthFt: bounds.maxXFt - bounds.minXFt,
+    depthFt: bounds.maxYFt - bounds.minYFt
+  };
+}
+
+export function getPolygonCentroidFt(footprint: Point2Ft[]): Point2Ft {
+  const normalizedPoints = normalizeFootprint(footprint);
+  const signedArea = getPolygonSignedAreaSqFt(normalizedPoints);
+
+  if (normalizedPoints.length < 3 || Math.abs(signedArea) <= GEOMETRY_EPSILON) {
+    const bounds = getPolygonBoundsFt(normalizedPoints);
+    return {
+      xFt: bounds.minXFt + bounds.widthFt / 2,
+      yFt: bounds.minYFt + bounds.depthFt / 2
+    };
+  }
+
+  let centroidXTimesSixArea = 0;
+  let centroidYTimesSixArea = 0;
+
+  for (let index = 0; index < normalizedPoints.length; index += 1) {
+    const current = normalizedPoints[index];
+    const next = normalizedPoints[(index + 1) % normalizedPoints.length];
+    const cross = current.xFt * next.yFt - next.xFt * current.yFt;
+    centroidXTimesSixArea += (current.xFt + next.xFt) * cross;
+    centroidYTimesSixArea += (current.yFt + next.yFt) * cross;
+  }
+
+  return {
+    xFt: centroidXTimesSixArea / (6 * signedArea),
+    yFt: centroidYTimesSixArea / (6 * signedArea)
+  };
+}
+
+function crossProduct(origin: Point2Ft, left: Point2Ft, right: Point2Ft): number {
+  return (left.xFt - origin.xFt) * (right.yFt - origin.yFt)
+    - (left.yFt - origin.yFt) * (right.xFt - origin.xFt);
+}
+
+function isPointInsideTriangle(point: Point2Ft, a: Point2Ft, b: Point2Ft, c: Point2Ft): boolean {
+  const area1 = crossProduct(point, a, b);
+  const area2 = crossProduct(point, b, c);
+  const area3 = crossProduct(point, c, a);
+  const hasNegative = area1 < -GEOMETRY_EPSILON || area2 < -GEOMETRY_EPSILON || area3 < -GEOMETRY_EPSILON;
+  const hasPositive = area1 > GEOMETRY_EPSILON || area2 > GEOMETRY_EPSILON || area3 > GEOMETRY_EPSILON;
+
+  return !(hasNegative && hasPositive);
+}
+
+export function triangulateFootprint(footprint: Point2Ft[]): Point2Ft[][] {
+  const normalizedPoints = normalizeFootprint(footprint);
+
+  if (normalizedPoints.length < 3) {
+    return [];
+  }
+
+  const orientedPoints = getPolygonSignedAreaSqFt(normalizedPoints) >= 0
+    ? normalizedPoints
+    : [...normalizedPoints].reverse();
+  const remainingIndices = orientedPoints.map((_, index) => index);
+  const triangles: Point2Ft[][] = [];
+  let safetyCounter = 0;
+
+  while (remainingIndices.length > 3 && safetyCounter < orientedPoints.length * orientedPoints.length) {
+    let earFound = false;
+
+    for (let index = 0; index < remainingIndices.length; index += 1) {
+      const previousIndex = remainingIndices[(index - 1 + remainingIndices.length) % remainingIndices.length];
+      const currentIndex = remainingIndices[index];
+      const nextIndex = remainingIndices[(index + 1) % remainingIndices.length];
+      const previousPoint = orientedPoints[previousIndex];
+      const currentPoint = orientedPoints[currentIndex];
+      const nextPoint = orientedPoints[nextIndex];
+
+      if (crossProduct(previousPoint, currentPoint, nextPoint) <= GEOMETRY_EPSILON) {
+        continue;
+      }
+
+      const containsAnotherPoint = remainingIndices.some((candidateIndex) => {
+        if (candidateIndex === previousIndex || candidateIndex === currentIndex || candidateIndex === nextIndex) {
+          return false;
+        }
+
+        return isPointInsideTriangle(orientedPoints[candidateIndex], previousPoint, currentPoint, nextPoint);
+      });
+
+      if (containsAnotherPoint) {
+        continue;
+      }
+
+      triangles.push([previousPoint, currentPoint, nextPoint]);
+      remainingIndices.splice(index, 1);
+      earFound = true;
+      break;
+    }
+
+    if (!earFound) {
+      break;
+    }
+
+    safetyCounter += 1;
+  }
+
+  if (remainingIndices.length === 3) {
+    triangles.push(remainingIndices.map((index) => orientedPoints[index]));
+  }
+
+  if (triangles.length === 0 && orientedPoints.length >= 3) {
+    for (let index = 1; index < orientedPoints.length - 1; index += 1) {
+      triangles.push([orientedPoints[0], orientedPoints[index], orientedPoints[index + 1]]);
+    }
+  }
+
+  return triangles;
+}
+
+export function getSpaceBoundsFt(space: Space): PolygonBoundsFt {
+  return getPolygonBoundsFt(space.footprint);
+}
+
+export function getSpaceLabelPointFt(space: Space): Point2Ft {
+  return getPolygonCentroidFt(space.footprint);
+}
+
 export function createStarterProjectDoc(): ProjectDoc {
   const levelId = "level-1";
 
@@ -155,28 +379,38 @@ export function createStarterProjectDoc(): ProjectDoc {
         id: "space-lobby",
         levelId,
         name: "Lobby",
-        xFt: 0,
-        yFt: 0,
-        widthFt: 18,
-        depthFt: 14
+        footprint: [
+          { xFt: 0, yFt: 2 },
+          { xFt: 14, yFt: 0 },
+          { xFt: 18, yFt: 10 },
+          { xFt: 12, yFt: 15 },
+          { xFt: 0, yFt: 13 }
+        ]
       },
       {
         id: "space-conference",
         levelId,
         name: "Conference",
-        xFt: 20,
-        yFt: 0,
-        widthFt: 16,
-        depthFt: 12
+        footprint: [
+          { xFt: 20, yFt: 1 },
+          { xFt: 34, yFt: 0 },
+          { xFt: 36, yFt: 8 },
+          { xFt: 31, yFt: 14 },
+          { xFt: 22, yFt: 12 }
+        ]
       },
       {
         id: "space-open-office",
         levelId,
         name: "Open Office",
-        xFt: 0,
-        yFt: 16,
-        widthFt: 24,
-        depthFt: 18
+        footprint: [
+          { xFt: 1, yFt: 18 },
+          { xFt: 11, yFt: 16 },
+          { xFt: 24, yFt: 18 },
+          { xFt: 23, yFt: 32 },
+          { xFt: 15, yFt: 35 },
+          { xFt: 2, yFt: 30 }
+        ]
       }
     ]
   };
@@ -199,7 +433,7 @@ export function getLevelSpaces(doc: ProjectDoc, levelId: string): Space[] {
 }
 
 export function getSpaceAreaSqFt(space: Space): number {
-  return getAreaSqFt(space.widthFt, space.depthFt);
+  return getPolygonAreaSqFt(space.footprint);
 }
 
 export function createLevel(doc: ProjectDoc, activeLevelId: string): LevelMutationResult {

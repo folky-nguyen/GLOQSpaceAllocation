@@ -34,15 +34,26 @@ Hard architecture rules:
 ## Workflow
 
 1. Read the user prompt.
-2. If the task is not a bug fix, read `MP.md` first.
+2. If the task is not a bug fix, read `MP.md` before any other repo discovery or text search.
 3. Read `SP.md` before making architecture or boundary changes.
 4. Read `KL.md` when repo terms or workflow terms are unclear.
 5. Read the relevant task note in `tasks/`.
 6. For bug-fix work, read the matching `tasks/FB<number> <task name>.md` first, then read `MP.md` only if the fix still needs repo discovery.
 7. If `MP.md` does not answer where to look, then search text.
 8. Make the smallest change that fits the task.
-9. After a non-bug-fix task, update `MP.md` if file discovery, folder ownership, or the doc index changed.
+9. After every non-bug-fix task, reopen `MP.md` and update it for any file discovery, folder ownership, entry point, or document index changes clarified by the task.
 10. Keep the active task note current when the task note is part of the workflow.
+
+## Sample Test Data Workflow
+
+- Keep `*.test.ts` for pure logic or critical API behavior.
+- For interactive editor validation cases, prefer checked-in sample data plus an in-app `Test` menu over hardcoded demo state in components.
+- Put sample-case metadata and JSON loading in `apps/web/src/test-cases.ts`, and keep the in-app loader UI in `apps/web/src/test-dashboard.tsx`.
+- Store reusable sample cases under `supabase/sample-data/<group>/<case-id>.json`.
+- Keep each sample case as one whole snapshot-compatible `ProjectDoc` JSON document.
+- Keep all sample geometry values in internal decimal feet and keep transient UI state out of sample files.
+- When adding a new validation group, target `3-5` concrete cases before expanding the menu structure.
+- When sample case conventions, locations, or groups change, update the active task note and `MP.md`.
 
 ## What Each File Does
 
@@ -60,6 +71,7 @@ Hard architecture rules:
 - `apps/api/src/`: axum HTTP surface, config loading, auth middleware, and API error shapes.
 - `crates/render-wasm/src/`: Rust wasm renderer entry points and WebGPU-facing code.
 - `supabase/migrations/`: schema and storage bootstrap for durable project persistence.
+- `supabase/sample-data/`: checked-in sample `ProjectDoc` fixtures for manual validation and future snapshot-compatible test cases.
 - `setup/`: local preview helpers and port-3001 runtime scripts.
 - `tasks/`: task notes and bug notes.
 
@@ -83,11 +95,13 @@ Hard architecture rules:
 - Prefer the smallest local diff.
 - Reuse an existing seam before adding a new one.
 - Do not search text first if `MP.md` already points to the right folder or file.
-- If `MP.md` is missing the needed path, update it after the task instead of leaving discovery to search-only.
+- Every non-bug-fix task starts with `MP.md` and ends with an `MP.md` review before reporting completion.
+- If `MP.md` is missing the needed path, update it during task closeout instead of leaving discovery to search-only.
 - Keep editor-only session state out of the Rust API and out of Supabase schema unless it must persist.
 - Keep browser auth config browser-safe. Never expose service-role credentials in `apps/web`.
 - Keep internal length math in decimal feet. Feet-inch parsing and formatting are UI-only.
 - Add tests only for pure logic or critical API behavior.
+- Do not invent a second sample-data schema for editor validation; keep sample files aligned with canonical `ProjectDoc` snapshots.
 - After each task, run the smallest relevant build or test, fix obvious breakages, then report:
   1. changed files
   2. commands run

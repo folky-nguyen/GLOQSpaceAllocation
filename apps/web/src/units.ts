@@ -12,6 +12,7 @@ const SINGLE_QUOTE_NORMALIZER = /[\u2018\u2019\u2032\u2035]/g;
 const DOUBLE_QUOTE_NORMALIZER = /[\u201C\u201D\u2033\u2036]/g;
 
 export type InchDenominator = 2 | 4 | 8 | 16;
+export type DefaultLengthUnit = "ft" | "in";
 
 type LengthParts = {
   feet: number;
@@ -59,7 +60,7 @@ function parseInchesComponent(text: string): number | null {
       return fraction;
     }
 
-    return parseIntegerToken(tokens[0]);
+    return parseUnsignedDecimal(tokens[0]);
   }
 
   if (tokens.length !== 2) {
@@ -209,6 +210,18 @@ function parseMarkerlessShorthand(body: string): LengthParts | null {
   return { feet, inches: wholeInches + fraction };
 }
 
+function parseBareLengthToken(body: string): number | null {
+  if (!body || body.includes("'") || body.includes("\"") || body.includes(" ")) {
+    return null;
+  }
+
+  return parseUnsignedDecimal(body);
+}
+
+function toFeetFromDefaultUnit(value: number, defaultUnit: DefaultLengthUnit): number {
+  return defaultUnit === "in" ? value / INCHES_PER_FOOT : value;
+}
+
 function getGreatestCommonDivisor(left: number, right: number): number {
   let a = Math.abs(left);
   let b = Math.abs(right);
@@ -268,21 +281,31 @@ export function getAreaSqFt(widthFt: number, depthFt: number): number {
   return widthFt * depthFt;
 }
 
-export function parseFeetAndInches(input: string): number | null {
+export function parseFeetAndInches(
+  input: string,
+  options?: { defaultUnit?: DefaultLengthUnit }
+): number | null {
   const normalizedInput = normalizeSignedInput(input);
 
   if (!normalizedInput) {
     return null;
   }
 
+  const defaultUnit = options?.defaultUnit ?? "ft";
   const parts = parseExplicitImperial(normalizedInput.body)
     ?? parseMarkerlessShorthand(normalizedInput.body);
 
-  if (!parts) {
+  if (parts) {
+    return normalizedInput.sign * (parts.feet + parts.inches / INCHES_PER_FOOT);
+  }
+
+  const bareValue = parseBareLengthToken(normalizedInput.body);
+
+  if (bareValue === null) {
     return null;
   }
 
-  return normalizedInput.sign * (parts.feet + parts.inches / INCHES_PER_FOOT);
+  return normalizedInput.sign * toFeetFromDefaultUnit(bareValue, defaultUnit);
 }
 
 export function formatFeetAndInches(
