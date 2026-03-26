@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type PointerEvent, type WheelEvent as ReactWheelEvent } from "react";
 import type { ProjectDoc } from "./project-doc";
-import type { Selection } from "./ui-store";
+import { getSelectionElementKey, type Selection } from "./ui-store";
 import {
   buildSpaceScenePayload,
   getDefaultOrbitCamera,
@@ -28,18 +28,18 @@ type RendererHandle = {
   render: () => void;
 };
 
-type RendererInfoHandle = {
-  free?: () => void;
-};
-
 type RenderWasmModule = {
   default: (input?: unknown) => Promise<unknown>;
   create_renderer: (canvas: HTMLCanvasElement) => Promise<RendererHandle>;
-  probe_webgpu: () => Promise<RendererInfoHandle>;
 };
 
 type ViewportPhase = "loading" | "ready" | "empty" | "unsupported" | "error";
 type DragMode = "orbit" | "pan";
+type ViewportIssue = {
+  detail: string | null;
+  summary: string;
+  typeLabel: string;
+};
 
 const visibilityModeOptions: Array<{ value: ThreeDVisibilityMode; label: string }> = [
   { value: "active-floor-only", label: "Active Floor Only" },
@@ -48,33 +48,134 @@ const visibilityModeOptions: Array<{ value: ThreeDVisibilityMode; label: string 
 
 let renderWasmModulePromise: Promise<RenderWasmModule> | null = null;
 
-function getErrorMessage(error: unknown): string {
-  const rawMessage = error instanceof Error
+function getRawErrorMessage(error: unknown): string {
+  return error instanceof Error
     ? error.message
     : typeof error === "string"
       ? error
-      : "Renderer initialization failed.";
+      : "3D renderer initialization failed.";
+}
 
-  if (rawMessage.includes("Failed to parse JSON payload")) {
-    return "Renderer payload mismatch. Run `pnpm build:wasm` and restart the web app.";
+function isPayloadMismatchMessage(message: string): boolean {
+  return message.includes("Failed to parse JSON payload");
+}
+
+function getPayloadMismatchIssue(): ViewportIssue {
+  return {
+    detail: "Run `pnpm build:wasm` and restart the web app so the JS payload and wasm package match again.",
+    summary: "The web app and the checked-in wasm renderer package are out of sync.",
+    typeLabel: "Renderer package mismatch"
+  };
+}
+
+function getMissingWebGpuIssue(): ViewportIssue {
+  return {
+    detail: "Use a WebGPU-enabled browser build on a machine with supported graphics drivers.",
+    summary: "This browser does not expose `navigator.gpu`, so the wasm renderer cannot start.",
+    typeLabel: "Browser missing WebGPU API"
+  };
+}
+
+function getUnavailableAdapterIssue(detail: string | null): ViewportIssue {
+  return {
+    detail,
+    summary: "The browser exposed WebGPU, but this device did not return a usable graphics adapter.",
+    typeLabel: "WebGPU adapter unavailable"
+  };
+}
+
+type BrowserGpuAdapter = object;
+type BrowserGpu = {
+  requestAdapter: () => Promise<BrowserGpuAdapter | null>;
+};
+
+function getBrowserGpu(): BrowserGpu | null {
+  return (navigator as Navigator & { gpu?: BrowserGpu }).gpu ?? null;
+}
+
+async function probeBrowserWebGpu(): Promise<{
+  issue: ViewportIssue | null;
+  phase: Extract<ViewportPhase, "unsupported" | "error"> | null;
+}> {
+  const gpu = getBrowserGpu();
+
+  if (!gpu) {
+    return {
+      issue: getMissingWebGpuIssue(),
+      phase: "unsupported"
+    };
   }
 
-  return rawMessage;
+  try {
+    const adapter = await gpu.requestAdapter();
+
+    if (adapter) {
+      return {
+        issue: null,
+        phase: null
+      };
+    }
+
+    return {
+      issue: getUnavailableAdapterIssue("Browser WebGPU probe returned no adapter."),
+      phase: "unsupported"
+    };
+  } catch (error) {
+    const failureState = getStartupFailureState(error);
+
+    return {
+      issue: failureState.issue,
+      phase: failureState.phase
+    };
+  }
 }
 
 function getStartupFailureState(error: unknown): {
-  message: string;
+  issue: ViewportIssue;
   phase: Extract<ViewportPhase, "unsupported" | "error">;
 } {
-  const message = getErrorMessage(error);
+  const message = getRawErrorMessage(error);
+
+  if (isPayloadMismatchMessage(message)) {
+    return {
+      issue: getPayloadMismatchIssue(),
+      phase: "error"
+    };
+  }
+
   const normalizedMessage = message.toLowerCase();
   const isNoAdapterFailure = normalizedMessage.includes("no suitable graphics adapter")
     || normalizedMessage.includes("webgpu found no adapters")
     || normalizedMessage.includes("no adapters");
 
+  if (isNoAdapterFailure) {
+    return {
+      issue: getUnavailableAdapterIssue(message),
+      phase: "unsupported"
+    };
+  }
+
   return {
-    message,
-    phase: isNoAdapterFailure ? "unsupported" : "error"
+    issue: {
+      detail: message,
+      summary: "The wasm renderer threw before the first frame could be drawn.",
+      typeLabel: "3D renderer startup failed"
+    },
+    phase: "error"
+  };
+}
+
+function getRenderFailureIssue(error: unknown): ViewportIssue {
+  const message = getRawErrorMessage(error);
+
+  if (isPayloadMismatchMessage(message)) {
+    return getPayloadMismatchIssue();
+  }
+
+  return {
+    detail: message,
+    summary: "The renderer started, but failed while sending the current scene to WebGPU.",
+    typeLabel: "3D renderer draw failed"
   };
 }
 
@@ -99,8 +200,12 @@ function getSelectionRecoveryKey(selection: Selection): string {
     return "none";
   }
 
-  if (selection.kind === "space-set") {
-    return `space-set:${selection.ids.join(",")}`;
+  if (selection.kind === "element") {
+    return `element:${getSelectionElementKey(selection.element)}`;
+  }
+
+  if (selection.kind === "element-set") {
+    return `element-set:${selection.elements.map(getSelectionElementKey).join(",")}`;
   }
 
   if (selection.kind === "site-edge") {
@@ -121,7 +226,7 @@ export default function ThreeDViewport({
 }: ThreeDViewportProps) {
   const scene = buildSpaceScenePayload(project, { activeLevelId, selection, visibilityMode });
   const [phase, setPhase] = useState<ViewportPhase>(scene.hasVisibleItems ? "loading" : "empty");
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [issue, setIssue] = useState<ViewportIssue | null>(null);
   const [camera, setCamera] = useState<OrbitCamera>(() => getDefaultOrbitCamera(scene));
   const [viewportSize, setViewportSize] = useState({ width: 1, height: 1 });
   const surfaceRef = useRef<HTMLDivElement | null>(null);
@@ -152,6 +257,9 @@ export default function ThreeDViewport({
     if (!scene.hasVisibleItems) {
       hasFitVisibleSceneRef.current = false;
       setCamera(getDefaultOrbitCamera(scene));
+      if (phase !== "error" && phase !== "unsupported") {
+        setIssue(null);
+      }
       setPhase((current) => (current === "error" || current === "unsupported" ? current : "empty"));
       return;
     }
@@ -221,7 +329,7 @@ export default function ThreeDViewport({
     rendererRef.current?.free?.();
     rendererRef.current = null;
     dragRef.current = null;
-    setErrorMessage(null);
+    setIssue(null);
     setPhase(scene.hasVisibleItems ? "loading" : "empty");
   }, [phase, recoveryKey, scene.hasVisibleItems]);
 
@@ -269,14 +377,8 @@ export default function ThreeDViewport({
       return;
     }
 
-    if (!("gpu" in navigator)) {
-      setPhase("unsupported");
-      setErrorMessage("This browser does not expose navigator.gpu.");
-      return;
-    }
-
     setPhase("loading");
-    setErrorMessage(null);
+    setIssue(null);
 
     void (async () => {
       try {
@@ -286,20 +388,23 @@ export default function ThreeDViewport({
           return;
         }
 
+        const browserProbe = await probeBrowserWebGpu();
+
+        if (isCancelled) {
+          return;
+        }
+
+        if (browserProbe.issue && browserProbe.phase) {
+          setPhase(browserProbe.phase);
+          setIssue(browserProbe.issue);
+          return;
+        }
+
         const renderWasm = await loadRenderWasmModule();
 
         if (isCancelled) {
           return;
         }
-
-        const rendererInfo = await renderWasm.probe_webgpu();
-
-        if (isCancelled) {
-          rendererInfo.free?.();
-          return;
-        }
-
-        rendererInfo.free?.();
 
         const renderer = await renderWasm.create_renderer(canvas);
 
@@ -310,6 +415,7 @@ export default function ThreeDViewport({
 
         rendererRef.current = renderer;
         renderer.resize(viewportSize.width, viewportSize.height);
+        setIssue(null);
         setPhase("ready");
       } catch (error) {
         if (isCancelled) {
@@ -318,7 +424,7 @@ export default function ThreeDViewport({
 
         const failureState = getStartupFailureState(error);
         setPhase(failureState.phase);
-        setErrorMessage(failureState.message);
+        setIssue(failureState.issue);
       }
     })();
 
@@ -342,7 +448,7 @@ export default function ThreeDViewport({
       renderer.render();
     } catch (error) {
       setPhase("error");
-      setErrorMessage(getErrorMessage(error));
+      setIssue(getRenderFailureIssue(error));
     }
   }, [activeLevelId, camera, phase, project, selection, visibilityMode, viewportSize.height, viewportSize.width]);
 
@@ -444,9 +550,9 @@ export default function ThreeDViewport({
   const stateBody = phase === "loading"
     ? "Initializing the wasm renderer and preparing the current project scene."
     : phase === "unsupported"
-      ? errorMessage
+      ? issue?.summary ?? null
       : phase === "error"
-        ? errorMessage
+        ? issue?.summary ?? null
         : phase === "empty"
           ? (
             hasSpacesOutsideActiveLevel
@@ -454,6 +560,8 @@ export default function ThreeDViewport({
               : "Add spaces to the project to generate 3D polygon extrusions."
           )
           : null;
+  const stateIssueType = phase === "unsupported" || phase === "error" ? issue?.typeLabel ?? null : null;
+  const stateIssueDetail = phase === "unsupported" || phase === "error" ? issue?.detail ?? null : null;
 
   return (
     <div className="viewport viewport-3d">
@@ -534,7 +642,9 @@ export default function ThreeDViewport({
         {stateTitle ? (
           <div className="three-d-state">
             <strong>{stateTitle}</strong>
-            <span>{stateBody}</span>
+            {stateBody ? <span>{stateBody}</span> : null}
+            {stateIssueType ? <span className="three-d-state-type">Type: {stateIssueType}</span> : null}
+            {stateIssueDetail ? <span className="three-d-state-detail">{stateIssueDetail}</span> : null}
             {phase === "empty" && hasSpacesOutsideActiveLevel ? (
               <button
                 type="button"

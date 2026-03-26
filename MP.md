@@ -13,6 +13,7 @@ Combined repo map and document index. This is the first lookup surface for non-b
 ## Workflow Docs
 
 - [AGENTS](./AGENTS.md): repo workflow, delivery rules, and update obligations.
+- [ER](./ER.md): trapped error registry with stable codes, canonical messages, file ownership, and message-format rules.
 - [SP](./SP.md): architecture contract for ownership and runtime boundaries.
 - [KL](./KL.md): selective glossary for specialized repo, workflow, calculation, and runtime concepts using `AI` and `HM` entries.
 - [QC](./QC.md): repeated user-facing regression traps.
@@ -51,6 +52,7 @@ Combined repo map and document index. This is the first lookup surface for non-b
 - `apps/web/src/main.tsx`: React bootstrap.
 - `apps/web/src/App.tsx`: route composition and protected editor entry.
 - `apps/web/src/editor-shell.tsx`: main editor UI shell.
+- `apps/web/src/styles.css`: editor shell layout, chrome styling, and responsive breakpoint behavior.
 - `apps/web/src/auth.ts`: browser auth client and auth snapshot store.
 - `apps/web/src/project-doc.ts`: current `ProjectDoc`, `Level`, and `Space` document helpers.
 - `apps/web/src/space-scene.ts`: derived 3D scene payload and default camera helpers.
@@ -65,6 +67,7 @@ Combined repo map and document index. This is the first lookup surface for non-b
 - `apps/api/src/config.rs`: env loading for API host, port, DB, and Supabase URL.
 - `apps/api/src/error.rs`: JSON API error envelope.
 - `crates/render-wasm/src/lib.rs`: wasm WebGPU entry points.
+- `ER.md`: trapped error registry for quick message-to-file lookup and message-format rules.
 - `supabase/migrations/20260324170000_init.sql`: current schema and storage bootstrap.
 - `supabase/sample-data/README.md`: conventions for checked-in sample `ProjectDoc` fixtures used by manual validation.
 - `supabase/sample-data/mixed/*.json`: mixed site-plan, level-stack, and polygon-space sample `ProjectDoc` fixtures with per-edge setbacks.
@@ -97,12 +100,21 @@ Combined repo map and document index. This is the first lookup surface for non-b
 - `014 site plan setbacks and mixed cases.md`: add a `Site Plan` view, per-edge setbacks, and reduce validation fixtures to three mixed site/layout cases.
 - `014.01 site plan mixed case hardening.md`: patch the mixed-case footprint regression and add one small sample-data containment guard.
 - `014.02 3d adapter failure triage after 014.01.md`: treat the post-014.01 failure as a general 3D startup problem across all mixed cases, then distinguish adapter availability, generated wasm pkg, and true regressions before fixing or selectively reverting.
+- `015 remove project browser.md`: remove the right-side `Project Browser` panel and the duplicated view, level, and space controls that only exist inside it.
+- `016 simplify ribbon controls.md`: remove dead ribbon groups and simplify the `Select` ribbon label so the top shell keeps only needed controls.
+- `016.01 remove sweep selection pipeline.md`: remove the drag-select mode and collapse the shell back to one click-selection flow.
+- `016.02 generic multi-element selection.md`: keep pick-many selection while moving the selection shape from space-specific branches to a future-ready element-ref seam.
+- `017 compact level manager layout.md`: tighten the `Level Manager` window with minimal JSX/CSS changes so it wastes less space.
+- `017.01 shared level headers and aligned actions.md`: redesign the `Levels` list with one shared desktop header row and straighter button columns.
 - `KL001 KL glossary structure and update workflow.md`: define the selective `KL.md` glossary format, the `AI`/`HM` entry split, and the workflow rule for updating `KL.md` when new specialized concepts are introduced.
 
 ### Bug Notes
 
 - `FB001 editor unreachable on port 3001.md`: diagnose and stabilize the local preview flow when port `3001` is occupied.
 - `FB002 vercel preview deployment not found.md`: document the Vercel `NOT_FOUND` preview failure and the explicit monorepo + SPA routing fix.
+- `FB003 3d adapter typed message and pnpm esbuild warning.md`: separate 3D startup failure typing from the trusted `esbuild` install-script warning and fix both with the smallest repo-level changes.
+- `FB004 error registry and trapped message standardization.md`: add the root error registry, normalize trapped web message copy, and require `ER.md` updates after future bug-fix tasks.
+- `FB005 3d startup should not block on wasm probe.md`: remove the blocking wasm probe from the 3D startup path and let the real renderer attempt start after a browser-side WebGPU check.
 
 ### Setup Docs
 

@@ -38,12 +38,13 @@ Hard architecture rules:
 3. Read `SP.md` before making architecture or boundary changes.
 4. Read `KL.md` when repo terms, workflow terms, or specialized calculation/runtime concepts are unclear.
 5. Read the relevant task note in `tasks/`.
-6. For bug-fix work, read the matching `tasks/FB<number> <task name>.md` first, then read `MP.md` only if the fix still needs repo discovery.
+6. For bug-fix work, read the matching `tasks/FB<number> <task name>.md` first, then read `ER.md`, then read `MP.md` only if the fix still needs repo discovery.
 7. If `MP.md` does not answer where to look, then search text.
 8. Make the smallest change that fits the task.
 9. After every non-bug-fix task, reopen `MP.md` and update it for any file discovery, folder ownership, entry point, or document index changes clarified by the task.
 10. If the task introduces a new glossary-worthy concept, changes the meaning of one, or renames a recurring repo term, update `KL.md` in the same task.
 11. Keep the active task note current when the task note is part of the workflow.
+12. After every `FB...` task, update `ER.md`. If the bug fix changes canonical trapped messages or owning files, update the registry rows. If the canonical rows do not change, add an explicit `FB` review note in `ER.md` so the review is still visible. Do not update `ER.md` for ordinary tasks unless the user explicitly asks for it.
 
 ## Sample Test Data Workflow
 
@@ -60,6 +61,7 @@ Hard architecture rules:
 
 - `SP.md`: architecture and implementation contract.
 - `KL.md`: selective glossary of specialized repo, workflow, calculation, and runtime concepts using `AI` and `HM` entries.
+- `ER.md`: trapped error registry with stable codes, canonical messages, source-file ownership, and message-format rules.
 - `QC.md`: repeated user-facing regression traps.
 - `MP.md`: single repo map and document index. Start here for non-bug-fix tasks.
 - `README.md`: human-facing project intro and quick-start.
@@ -100,6 +102,12 @@ Hard architecture rules:
 - If `MP.md` is missing the needed path, update it during task closeout instead of leaving discovery to search-only.
 - Update `KL.md` in the same task when you introduce a new specialized repo concept, change the meaning of one, or rename a recurring term contributors should keep using.
 - Do not update `KL.md` for ordinary local variables, generic framework terms, or trivial refactors with no terminology change.
+- Trapped error messages must follow the message rules documented in `ER.md`.
+- When a surface has both a human summary and a low-level error detail, keep the summary as the primary message and keep the low-level text separate.
+- After every `FB...` task, update `ER.md`.
+- If a bug fix changes trapped error messages or their owning files, update the matching registry rows in `ER.md`.
+- If a bug fix does not change canonical registry rows, add a short `FB` review note in `ER.md` that records what was reviewed and why the rows stayed the same.
+- Ordinary tasks do not need an `ER.md` update unless explicitly requested.
 - Keep editor-only session state out of the Rust API and out of Supabase schema unless it must persist.
 - Keep browser auth config browser-safe. Never expose service-role credentials in `apps/web`.
 - Keep internal length math in decimal feet. Feet-inch parsing and formatting are UI-only.

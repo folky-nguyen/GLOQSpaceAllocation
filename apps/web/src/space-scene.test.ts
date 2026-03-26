@@ -95,7 +95,7 @@ describe("buildSpaceScenePayload", () => {
   });
 
   it("gives the selected space stronger emphasis than the rest of its level", () => {
-    const scene = buildScene({ kind: "space", id: "space-l2-a" });
+    const scene = buildScene({ kind: "element", element: { kind: "space", id: "space-l2-a" } });
     const selected = scene.items.find((item) => item.id === "space-l2-a");
 
     expect(selected?.emphasis).toBe("selected");
@@ -131,8 +131,25 @@ describe("buildSpaceScenePayload", () => {
   });
 
   it("keeps the selected space strongest even when all levels are visible", () => {
-    const scene = buildScene({ kind: "space", id: "space-b1-a" }, "all-levels");
+    const scene = buildScene({ kind: "element", element: { kind: "space", id: "space-b1-a" } }, "all-levels");
 
+    expect(scene.items.find((item) => item.id === "space-b1-a")?.emphasis).toBe("selected");
+    expect(scene.items.find((item) => item.id === "space-l2-a")?.emphasis).toBe("active-level");
+  });
+
+  it("keeps multiple selected spaces emphasized through the shared element refs", () => {
+    const scene = buildScene(
+      {
+        kind: "element-set",
+        elements: [
+          { kind: "space", id: "space-l1-a" },
+          { kind: "space", id: "space-b1-a" }
+        ]
+      },
+      "all-levels"
+    );
+
+    expect(scene.items.find((item) => item.id === "space-l1-a")?.emphasis).toBe("selected");
     expect(scene.items.find((item) => item.id === "space-b1-a")?.emphasis).toBe("selected");
     expect(scene.items.find((item) => item.id === "space-l2-a")?.emphasis).toBe("active-level");
   });

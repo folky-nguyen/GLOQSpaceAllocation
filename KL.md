@@ -11,6 +11,9 @@ Selective glossary for specialized repo and workflow concepts. Use this file for
 ### `MP.md`
 - AI: The repo map and document index that non-bug-fix tasks read first before broader discovery or text search.
 - HM: null
+### `ER.md`
+- AI: The trapped error registry that assigns stable codes, canonical message text, and owning source-file paths for intentionally surfaced errors. Bug-fix tasks update it when those messages change.
+- HM: null
 ### `SP.md`
 - AI: The architecture contract that states ownership boundaries between the TypeScript editor, the Rust wasm renderer, the Rust API, and persistence.
 - HM: null
@@ -19,6 +22,9 @@ Selective glossary for specialized repo and workflow concepts. Use this file for
 - HM: null
 ### `bug note`
 - AI: A bug or failure note in `tasks/FB<number> <task name>.md` that records evidence, fix scope, and verification for a bug-focused task.
+- HM: null
+### `trapped error message`
+- AI: A deliberately surfaced validation, capability, recovery, or failure message that stops a flow early and helps a human recover or triage, instead of only exposing a raw exception string.
 - HM: null
 ## 2. Document And Domain Terms
 ### `ProjectDoc`
@@ -64,10 +70,10 @@ Selective glossary for specialized repo and workflow concepts. Use this file for
 - AI: The session UI mode stored in the zustand UI store. It currently switches the workspace between `plan`, `site-plan`, and `3d`.
 - HM: null
 ### `selection`
-- AI: The current editor selection stored in the zustand UI store. It can point at a view, site edge, level, one space, or a multi-space set.
+- AI: The current editor selection stored in the zustand UI store. It can point at a view, site edge, level, one selected element ref, or a multi-element set. Today the only supported selection element kind is `space`.
 - HM: null
-### `selectMode`
-- AI: The current multi-selection behavior stored in the UI store, currently `pick-many` or `sweep`.
+### `selection element ref`
+- AI: The transient discriminated ref used inside `selection` to identify one selectable editor element. It currently supports `{ kind: "space"; id }` and exists so future selectable 3D element kinds can plug into the same shell seam without inventing a second selection shape.
 - HM: null
 ### `auth snapshot`
 - AI: The browser-side auth store state in `apps/web/src/auth.ts`. It tracks sign-in status, current session, user, error state, pending OTP context, and password-recovery readiness.

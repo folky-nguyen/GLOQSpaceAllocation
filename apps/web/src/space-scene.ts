@@ -4,7 +4,7 @@ import {
   type ProjectDoc,
   type Point2Ft
 } from "./project-doc";
-import type { Selection } from "./ui-store";
+import { hasSelectionSpace, type Selection } from "./ui-store";
 
 export type SpacePrismEmphasis = "normal" | "active-level" | "selected";
 export type ThreeDVisibilityMode = "active-floor-only" | "all-levels";
@@ -147,11 +147,7 @@ function getLookAtMatrix(eye: [number, number, number], target: [number, number,
 }
 
 function getEmphasis(selection: Selection, activeLevelId: string | null, spaceId: string, levelId: string): SpacePrismEmphasis {
-  if (selection?.kind === "space" && selection.id === spaceId) {
-    return "selected";
-  }
-
-  if (selection?.kind === "space-set" && selection.ids.includes(spaceId)) {
+  if (hasSelectionSpace(selection, spaceId)) {
     return "selected";
   }
 

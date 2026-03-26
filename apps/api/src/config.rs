@@ -71,14 +71,14 @@ impl fmt::Display for ConfigError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::MissingRequired(name) => {
-                write!(formatter, "missing required environment variable {name}")
+                write!(formatter, "Missing required environment variable {name}.")
             }
             Self::InvalidUnicode(name) => write!(
                 formatter,
-                "environment variable {name} must be valid unicode"
+                "Environment variable {name} must be valid Unicode."
             ),
             Self::InvalidPort { value, .. } => {
-                write!(formatter, "API_PORT must be a valid u16, got {value}")
+                write!(formatter, "API_PORT must be a valid u16, got {value}.")
             }
         }
     }
