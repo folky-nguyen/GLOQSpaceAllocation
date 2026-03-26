@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, type RefObject } from "react";
+import { useDraggablePanel } from "./draggable-panel";
 import {
   feetToMeters,
   formatFeetAndInches,
@@ -11,6 +12,7 @@ import {
 
 type UnitsInspectorProps = {
   open: boolean;
+  workspaceRef: RefObject<HTMLElement | null>;
   onClose: () => void;
 };
 
@@ -48,7 +50,7 @@ function formatNumber(value: number, maximumFractionDigits = 6): string {
   }).format(value);
 }
 
-export default function UnitsInspector({ open, onClose }: UnitsInspectorProps) {
+export default function UnitsInspector({ open, workspaceRef, onClose }: UnitsInspectorProps) {
   const [parseInput, setParseInput] = useState("1.24");
   const [defaultUnit, setDefaultUnit] = useState<DefaultLengthUnit>("ft");
   const [feetInput, setFeetInput] = useState("12.5");
@@ -56,6 +58,7 @@ export default function UnitsInspector({ open, onClose }: UnitsInspectorProps) {
   const [metersInput, setMetersInput] = useState("3.048");
   const [widthInput, setWidthInput] = useState("24");
   const [depthInput, setDepthInput] = useState("18");
+  const { panelRef, handleHeaderPointerDown, panelStyle } = useDraggablePanel<HTMLElement>(workspaceRef);
 
   if (!open) {
     return null;
@@ -82,8 +85,15 @@ export default function UnitsInspector({ open, onClose }: UnitsInspectorProps) {
     : getAreaSqFt(widthValue, depthValue);
 
   return (
-    <aside className="units-inspector" role="dialog" aria-label="Units inspector" aria-modal="false">
-      <header className="units-inspector-header">
+    <aside
+      ref={panelRef}
+      className="units-inspector"
+      role="dialog"
+      aria-label="Units inspector"
+      aria-modal="false"
+      style={panelStyle}
+    >
+      <header className="units-inspector-header" onPointerDown={handleHeaderPointerDown}>
         <div>
           <strong>Units Inspector</strong>
           <span>Manual parse, format, conversion, and area checks</span>

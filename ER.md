@@ -16,6 +16,9 @@ Registry for trapped error messages that are intentionally surfaced in the produ
 - If the UI has a separate detail slot, keep low-level detail there.
 - If the UI only has one error string, append the low-level detail after `Detail:` so the canonical summary still stays first.
 - For typed overlays that already split `Title`, `Type`, and `Detail`, register the summary sentence here and keep the type label short and title case in code.
+- Product surfaces should expose the stable error code near trapped messages so screenshots and copied text can be matched back to this registry quickly.
+- For single-string surfaces, prefer `Summary. Code: <CODE>.` before any `Detail:` suffix.
+- For typed overlays, prefer a separate `Code: <CODE>` line while keeping the canonical summary unchanged.
 - `Path` should point to the source file that traps or emits the message.
 
 ## Registry
@@ -73,3 +76,5 @@ Registry for trapped error messages that are intentionally surfaced in the produ
 ## FB Review Log
 
 - `2026-03-26` `FB005`: reviewed `WEB-3D-001` and `WEB-3D-002` in [`apps/web/src/three-d-viewport.tsx`](./apps/web/src/three-d-viewport.tsx). The startup order changed from a blocking wasm probe to a browser-side WebGPU probe, but the canonical trapped messages and owning file stayed the same, so the registry rows did not change.
+- `2026-03-26` `FB006`: reviewed `WEB-3D-001`, `WEB-3D-002`, and `WEB-3D-004` in [`apps/web/src/three-d-viewport.tsx`](./apps/web/src/three-d-viewport.tsx). The browser probe now uses a closer high-performance request and only blocks on missing `navigator.gpu`; adapter-null and probe-thrown results were downgraded to startup diagnostics. The canonical primary messages and owning file stayed the same, so the registry rows did not change.
+- `2026-03-27` `FB006.01`: reviewed the trapped web message surfaces in [`apps/web/src/App.tsx`](./apps/web/src/App.tsx), [`apps/web/src/editor-shell.tsx`](./apps/web/src/editor-shell.tsx), and [`apps/web/src/three-d-viewport.tsx`](./apps/web/src/three-d-viewport.tsx). The product now surfaces stable `Code: <CODE>` markers for registry-backed web errors, `WEB-3D-002` exposes an in-place retry action, a best-effort `Open Chrome System Settings` action for `chrome://settings/system`, and a fresh-window handoff path on the typed overlay, and renderer startup now wraps `navigator.gpu.requestAdapter(...)` in a softer fallback chain that strips ignored `powerPreference` on Windows and dedupes equivalent runtime attempts after sanitization. The user-facing `WEB-3D-002` detail is now reduced to a short recovery instruction that points to `chrome://settings/system` and relaunching Chrome. The canonical primary messages and owning files stayed the same, so the registry rows did not change.

@@ -3,6 +3,8 @@ import type { Selection } from "./ui-store";
 import {
   buildSpaceScenePayload,
   getDefaultOrbitCamera,
+  getVisibleSpacePrisms,
+  pickVisibleSpaceAtCanvasPoint,
   type SpaceScenePayload,
   type ThreeDVisibilityMode
 } from "./space-scene";
@@ -182,6 +184,24 @@ describe("buildSpaceScenePayload", () => {
   });
 });
 
+describe("getVisibleSpacePrisms", () => {
+  it("keeps the visible-space descriptors aligned with the current 3D scope", () => {
+    const prisms = getVisibleSpacePrisms(createSceneDoc(), {
+      activeLevelId: "level-2",
+      selection: null,
+      visibilityMode: "active-floor-only"
+    });
+
+    expect(prisms).toHaveLength(1);
+    expect(prisms[0]).toMatchObject({
+      id: "space-l2-a",
+      levelId: "level-2",
+      minZFt: 12,
+      maxZFt: 23
+    });
+  });
+});
+
 describe("getDefaultOrbitCamera", () => {
   it("fits the camera around the current scene extents", () => {
     const camera = getDefaultOrbitCamera(buildScene());
@@ -216,5 +236,43 @@ describe("getDefaultOrbitCamera", () => {
       yawDeg: -35,
       pitchDeg: 35
     });
+  });
+});
+
+describe("pickVisibleSpaceAtCanvasPoint", () => {
+  it("picks the centered visible prism when clicking through the middle of the viewport", () => {
+    const scene = buildScene();
+    const picked = pickVisibleSpaceAtCanvasPoint({
+      prisms: getVisibleSpacePrisms(createSceneDoc(), {
+        activeLevelId: "level-2",
+        selection: null,
+        visibilityMode: "active-floor-only"
+      }),
+      camera: getDefaultOrbitCamera(scene),
+      canvasX: 400,
+      canvasY: 300,
+      viewportWidth: 800,
+      viewportHeight: 600
+    });
+
+    expect(picked?.id).toBe("space-l2-a");
+  });
+
+  it("returns null when the click misses every visible prism", () => {
+    const scene = buildScene();
+    const picked = pickVisibleSpaceAtCanvasPoint({
+      prisms: getVisibleSpacePrisms(createSceneDoc(), {
+        activeLevelId: "level-2",
+        selection: null,
+        visibilityMode: "active-floor-only"
+      }),
+      camera: getDefaultOrbitCamera(scene),
+      canvasX: 10,
+      canvasY: 10,
+      viewportWidth: 800,
+      viewportHeight: 600
+    });
+
+    expect(picked).toBeNull();
   });
 });

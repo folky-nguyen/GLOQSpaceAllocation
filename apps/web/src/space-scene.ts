@@ -21,6 +21,17 @@ export type SpacePrismRenderItem = {
   emphasis: SpacePrismEmphasis;
 };
 
+export type VisibleSpacePrism = {
+  id: string;
+  levelId: string;
+  name: string;
+  emphasis: SpacePrismEmphasis;
+  footprint: Point2Ft[];
+  minZFt: number;
+  maxZFt: number;
+  bounds: ReturnType<typeof getSpaceBoundsFt>;
+};
+
 export type SceneExtents = {
   minXFt: number;
   minYFt: number;
@@ -213,6 +224,14 @@ function toPosition(point: Point2Ft, zFt: number): [number, number, number] {
   return [point.xFt, point.yFt, zFt];
 }
 
+function addVectors(left: [number, number, number], right: [number, number, number]): [number, number, number] {
+  return [left[0] + right[0], left[1] + right[1], left[2] + right[2]];
+}
+
+function scaleVector(vector: [number, number, number], scalar: number): [number, number, number] {
+  return [vector[0] * scalar, vector[1] * scalar, vector[2] * scalar];
+}
+
 function appendPolygonPrismVertices(
   vertices: SceneVertex[],
   footprint: Point2Ft[],
@@ -303,15 +322,12 @@ function shouldIncludeSpace(
   return spaceLevelId === activeLevelId;
 }
 
-export function buildSpaceScenePayload(
+export function getVisibleSpacePrisms(
   doc: ProjectDoc,
   input: { activeLevelId: string | null; selection: Selection; visibilityMode: ThreeDVisibilityMode }
-): SpaceScenePayload {
+): VisibleSpacePrism[] {
   const levelsById = new Map(doc.levels.map((level) => [level.id, level]));
-  const items: SpacePrismRenderItem[] = [];
-  const vertices: SceneVertex[] = [];
-  const edgeVertices: SceneVertex[] = [];
-  let extents: SceneExtents | null = null;
+  const prisms: VisibleSpacePrism[] = [];
 
   for (const space of doc.spaces) {
     const level = levelsById.get(space.levelId);
@@ -320,36 +336,178 @@ export function buildSpaceScenePayload(
       continue;
     }
 
-    const emphasis = getEmphasis(input.selection, input.activeLevelId, space.id, space.levelId);
-    const bounds = getSpaceBoundsFt(space);
-    items.push({
+    prisms.push({
       id: space.id,
       levelId: space.levelId,
       name: space.name,
-      emphasis
+      emphasis: getEmphasis(input.selection, input.activeLevelId, space.id, space.levelId),
+      footprint: space.footprint,
+      minZFt: level.elevationFt,
+      maxZFt: level.elevationFt + level.heightFt,
+      bounds: getSpaceBoundsFt(space)
     });
-    appendPolygonPrismVertices(vertices, space.footprint, level.elevationFt, level.heightFt, emphasis);
-    appendPolygonPrismEdges(edgeVertices, space.footprint, level.elevationFt, level.heightFt, emphasis);
+  }
+
+  return prisms;
+}
+
+function intersectRayWithTriangle(
+  origin: [number, number, number],
+  direction: [number, number, number],
+  a: [number, number, number],
+  b: [number, number, number],
+  c: [number, number, number]
+): number | null {
+  const edgeAB = subtractVectors(b, a);
+  const edgeAC = subtractVectors(c, a);
+  const pVector = crossVectors(direction, edgeAC);
+  const determinant = dotVectors(edgeAB, pVector);
+
+  if (Math.abs(determinant) <= Number.EPSILON) {
+    return null;
+  }
+
+  const inverseDeterminant = 1 / determinant;
+  const tVector = subtractVectors(origin, a);
+  const u = dotVectors(tVector, pVector) * inverseDeterminant;
+
+  if (u < 0 || u > 1) {
+    return null;
+  }
+
+  const qVector = crossVectors(tVector, edgeAB);
+  const v = dotVectors(direction, qVector) * inverseDeterminant;
+
+  if (v < 0 || u + v > 1) {
+    return null;
+  }
+
+  const distance = dotVectors(edgeAC, qVector) * inverseDeterminant;
+  return distance > 0.0001 ? distance : null;
+}
+
+function intersectRayWithPrism(
+  prism: VisibleSpacePrism,
+  origin: [number, number, number],
+  direction: [number, number, number]
+): number | null {
+  let closestDistance: number | null = null;
+  const topTriangles = triangulateFootprint(prism.footprint);
+
+  for (const triangle of topTriangles) {
+    const hitDistance = intersectRayWithTriangle(
+      origin,
+      direction,
+      toPosition(triangle[0], prism.maxZFt),
+      toPosition(triangle[1], prism.maxZFt),
+      toPosition(triangle[2], prism.maxZFt)
+    );
+
+    if (hitDistance !== null && (closestDistance === null || hitDistance < closestDistance)) {
+      closestDistance = hitDistance;
+    }
+  }
+
+  for (let index = 0; index < prism.footprint.length; index += 1) {
+    const current = prism.footprint[index];
+    const next = prism.footprint[(index + 1) % prism.footprint.length];
+    const currentBottom = toPosition(current, prism.minZFt);
+    const currentTop = toPosition(current, prism.maxZFt);
+    const nextTop = toPosition(next, prism.maxZFt);
+    const nextBottom = toPosition(next, prism.minZFt);
+    const firstSideHit = intersectRayWithTriangle(origin, direction, currentBottom, currentTop, nextTop);
+    const secondSideHit = intersectRayWithTriangle(origin, direction, currentBottom, nextTop, nextBottom);
+
+    if (firstSideHit !== null && (closestDistance === null || firstSideHit < closestDistance)) {
+      closestDistance = firstSideHit;
+    }
+
+    if (secondSideHit !== null && (closestDistance === null || secondSideHit < closestDistance)) {
+      closestDistance = secondSideHit;
+    }
+  }
+
+  return closestDistance;
+}
+
+export function pickVisibleSpaceAtCanvasPoint(input: {
+  prisms: VisibleSpacePrism[];
+  camera: OrbitCamera;
+  canvasX: number;
+  canvasY: number;
+  viewportWidth: number;
+  viewportHeight: number;
+}): VisibleSpacePrism | null {
+  const safeWidth = Math.max(input.viewportWidth, 1);
+  const safeHeight = Math.max(input.viewportHeight, 1);
+  const normalizedX = (input.canvasX / safeWidth) * 2 - 1;
+  const normalizedY = 1 - (input.canvasY / safeHeight) * 2;
+  const aspectRatio = safeWidth / safeHeight;
+  const tanHalfFov = Math.tan(degreesToRadians(45) / 2);
+  const frame = getOrbitCameraFrame(input.camera);
+  const rayDirection = normalizeVector(addVectors(
+    addVectors(
+      frame.forward,
+      scaleVector(frame.right, normalizedX * tanHalfFov * aspectRatio)
+    ),
+    scaleVector(frame.up, normalizedY * tanHalfFov)
+  ));
+  let closestPrism: VisibleSpacePrism | null = null;
+  let closestDistance = Number.POSITIVE_INFINITY;
+
+  for (const prism of input.prisms) {
+    const hitDistance = intersectRayWithPrism(prism, frame.eye, rayDirection);
+
+    if (hitDistance === null || hitDistance >= closestDistance) {
+      continue;
+    }
+
+    closestDistance = hitDistance;
+    closestPrism = prism;
+  }
+
+  return closestPrism;
+}
+
+export function buildSpaceScenePayload(
+  doc: ProjectDoc,
+  input: { activeLevelId: string | null; selection: Selection; visibilityMode: ThreeDVisibilityMode }
+): SpaceScenePayload {
+  const prisms = getVisibleSpacePrisms(doc, input);
+  const items: SpacePrismRenderItem[] = [];
+  const vertices: SceneVertex[] = [];
+  const edgeVertices: SceneVertex[] = [];
+  let extents: SceneExtents | null = null;
+
+  for (const prism of prisms) {
+    items.push({
+      id: prism.id,
+      levelId: prism.levelId,
+      name: prism.name,
+      emphasis: prism.emphasis
+    });
+    appendPolygonPrismVertices(vertices, prism.footprint, prism.minZFt, prism.maxZFt - prism.minZFt, prism.emphasis);
+    appendPolygonPrismEdges(edgeVertices, prism.footprint, prism.minZFt, prism.maxZFt - prism.minZFt, prism.emphasis);
 
     if (!extents) {
       extents = {
-        minXFt: bounds.minXFt,
-        minYFt: bounds.minYFt,
-        minZFt: level.elevationFt,
-        maxXFt: bounds.maxXFt,
-        maxYFt: bounds.maxYFt,
-        maxZFt: level.elevationFt + level.heightFt
+        minXFt: prism.bounds.minXFt,
+        minYFt: prism.bounds.minYFt,
+        minZFt: prism.minZFt,
+        maxXFt: prism.bounds.maxXFt,
+        maxYFt: prism.bounds.maxYFt,
+        maxZFt: prism.maxZFt
       };
       continue;
     }
 
     extents = {
-      minXFt: Math.min(extents.minXFt, bounds.minXFt),
-      minYFt: Math.min(extents.minYFt, bounds.minYFt),
-      minZFt: Math.min(extents.minZFt, level.elevationFt),
-      maxXFt: Math.max(extents.maxXFt, bounds.maxXFt),
-      maxYFt: Math.max(extents.maxYFt, bounds.maxYFt),
-      maxZFt: Math.max(extents.maxZFt, level.elevationFt + level.heightFt)
+      minXFt: Math.min(extents.minXFt, prism.bounds.minXFt),
+      minYFt: Math.min(extents.minYFt, prism.bounds.minYFt),
+      minZFt: Math.min(extents.minZFt, prism.minZFt),
+      maxXFt: Math.max(extents.maxXFt, prism.bounds.maxXFt),
+      maxYFt: Math.max(extents.maxYFt, prism.bounds.maxYFt),
+      maxZFt: Math.max(extents.maxZFt, prism.maxZFt)
     };
   }
 

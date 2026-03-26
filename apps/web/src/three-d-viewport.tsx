@@ -6,9 +6,12 @@ import {
   getDefaultOrbitCamera,
   getOrbitCameraFrame,
   getOrbitCameraViewProjectionMatrix,
+  getVisibleSpacePrisms,
+  pickVisibleSpaceAtCanvasPoint,
   type OrbitCamera,
   type ThreeDVisibilityMode
 } from "./space-scene";
+import { getTrappedErrorCode } from "./error-codes";
 
 type ThreeDViewportProps = {
   project: ProjectDoc;
@@ -18,6 +21,8 @@ type ThreeDViewportProps = {
   selectionLabel: string;
   visibilityMode: ThreeDVisibilityMode;
   onChangeVisibilityMode: (mode: ThreeDVisibilityMode) => void;
+  onOpenFreshWindow: () => void;
+  onPickSpace: (spaceId: string) => void;
 };
 
 type RendererHandle = {
@@ -41,12 +46,25 @@ type ViewportIssue = {
   typeLabel: string;
 };
 
+type StartupFailure = {
+  issue: ViewportIssue;
+  phase: Extract<ViewportPhase, "unsupported" | "error">;
+};
+
+type BrowserWebGpuProbeResult = {
+  blockingFailure: StartupFailure | null;
+  startupDiagnostic: string | null;
+};
+
 const visibilityModeOptions: Array<{ value: ThreeDVisibilityMode; label: string }> = [
   { value: "active-floor-only", label: "Active Floor Only" },
   { value: "all-levels", label: "All Levels" }
 ];
 
 let renderWasmModulePromise: Promise<RenderWasmModule> | null = null;
+const browserNoAdapterShortDetail = "No available adapter.";
+const browserNoAdapterRecoveryHint = "Go to chrome://settings/system, turn on Use graphics acceleration when available, then relaunch Chrome.";
+const chromeSystemSettingsUrl = "chrome://settings/system";
 
 function getRawErrorMessage(error: unknown): string {
   return error instanceof Error
@@ -76,65 +94,321 @@ function getMissingWebGpuIssue(): ViewportIssue {
   };
 }
 
-function getUnavailableAdapterIssue(detail: string | null): ViewportIssue {
+function mergeIssueDetail(...parts: Array<string | null>): string | null {
+  const merged = Array.from(new Set(
+    parts
+      .map((part) => part?.trim())
+      .filter((part): part is string => Boolean(part))
+  ));
+
+  return merged.length > 0 ? merged.join(" ") : null;
+}
+
+function getUnavailableAdapterIssue(): ViewportIssue {
   return {
-    detail,
+    detail: mergeIssueDetail(browserNoAdapterShortDetail, browserNoAdapterRecoveryHint),
     summary: "The browser exposed WebGPU, but this device did not return a usable graphics adapter.",
     typeLabel: "WebGPU adapter unavailable"
   };
 }
 
 type BrowserGpuAdapter = object;
-type BrowserGpu = {
-  requestAdapter: () => Promise<BrowserGpuAdapter | null>;
+type BrowserGpuRequestAdapterOptions = {
+  forceFallbackAdapter?: boolean;
+  powerPreference?: "high-performance" | "low-power";
 };
+type BrowserGpu = {
+  requestAdapter: (options?: BrowserGpuRequestAdapterOptions) => Promise<BrowserGpuAdapter | null>;
+};
+
+type BrowserGpuRequestAdapterAttempt = {
+  label: string;
+  options?: BrowserGpuRequestAdapterOptions;
+};
+
+type BrowserGpuRequestAdapterResult = {
+  adapter: BrowserGpuAdapter | null;
+  diagnostic: string | null;
+  thrownError: unknown | null;
+};
+
+type BrowserWindowOpen = (
+  url?: string | URL,
+  target?: string,
+  features?: string
+) => WindowProxy | null;
 
 function getBrowserGpu(): BrowserGpu | null {
   return (navigator as Navigator & { gpu?: BrowserGpu }).gpu ?? null;
 }
 
-async function probeBrowserWebGpu(): Promise<{
-  issue: ViewportIssue | null;
-  phase: Extract<ViewportPhase, "unsupported" | "error"> | null;
-}> {
+function getBrowserUserAgent(): string {
+  return typeof navigator === "undefined" ? "" : navigator.userAgent;
+}
+
+export function isWindowsUserAgent(userAgent: string): boolean {
+  return /\bWindows\b/i.test(userAgent);
+}
+
+function cloneBrowserGpuRequestAdapterOptions(
+  options?: BrowserGpuRequestAdapterOptions
+): BrowserGpuRequestAdapterOptions | undefined {
+  return options ? { ...options } : undefined;
+}
+
+function normalizeBrowserGpuRequestAdapterOptions(
+  options?: BrowserGpuRequestAdapterOptions
+): BrowserGpuRequestAdapterOptions | undefined {
+  if (!options) {
+    return undefined;
+  }
+
+  const normalized = { ...options };
+
+  if (normalized.powerPreference === undefined) {
+    delete normalized.powerPreference;
+  }
+
+  if (normalized.forceFallbackAdapter === undefined) {
+    delete normalized.forceFallbackAdapter;
+  }
+
+  return Object.keys(normalized).length > 0 ? normalized : undefined;
+}
+
+export function sanitizeBrowserGpuRequestAdapterOptions(
+  options?: BrowserGpuRequestAdapterOptions,
+  userAgent = getBrowserUserAgent()
+): BrowserGpuRequestAdapterOptions | undefined {
+  const normalized = normalizeBrowserGpuRequestAdapterOptions(options);
+
+  if (!normalized) {
+    return undefined;
+  }
+
+  if (!isWindowsUserAgent(userAgent)) {
+    return normalized;
+  }
+
+  const sanitized = { ...normalized };
+  delete sanitized.powerPreference;
+  return normalizeBrowserGpuRequestAdapterOptions(sanitized);
+}
+
+export function openChromeSystemSettingsTab(
+  openWindow: BrowserWindowOpen = (url, target, features) => window.open(url, target, features)
+): boolean {
+  try {
+    return openWindow(chromeSystemSettingsUrl, "_blank", "noopener,noreferrer") !== null;
+  } catch {
+    return false;
+  }
+}
+
+function getBrowserGpuRequestAdapterAttemptKey(options?: BrowserGpuRequestAdapterOptions): string {
+  const normalized = normalizeBrowserGpuRequestAdapterOptions(options);
+
+  if (!normalized) {
+    return "default";
+  }
+
+  return JSON.stringify(
+    Object.entries(normalized).sort(([leftKey], [rightKey]) => leftKey.localeCompare(rightKey))
+  );
+}
+
+export function getBrowserGpuRequestAdapterAttempts(
+  options?: BrowserGpuRequestAdapterOptions
+): BrowserGpuRequestAdapterAttempt[] {
+  const requestedOptions = cloneBrowserGpuRequestAdapterOptions(options);
+  const attempts: BrowserGpuRequestAdapterAttempt[] = [
+    {
+      label: "requested adapter settings",
+      options: requestedOptions
+    }
+  ];
+
+  if (requestedOptions?.powerPreference === "high-performance") {
+    const browserDefaultOptions = normalizeBrowserGpuRequestAdapterOptions({
+      ...requestedOptions,
+      powerPreference: undefined
+    });
+
+    if (browserDefaultOptions || requestedOptions) {
+      attempts.push({
+        label: "browser-default adapter request",
+        options: browserDefaultOptions
+      });
+    }
+
+    attempts.push({
+      label: "low-power adapter request",
+      options: {
+        ...requestedOptions,
+        powerPreference: "low-power"
+      }
+    });
+  }
+
+  if (requestedOptions && requestedOptions.powerPreference !== "high-performance") {
+    const browserDefaultOptions = normalizeBrowserGpuRequestAdapterOptions({
+      ...requestedOptions,
+      powerPreference: undefined
+    });
+
+    attempts.push({
+      label: "browser-default adapter request",
+      options: browserDefaultOptions
+    });
+  }
+
+  if (requestedOptions?.forceFallbackAdapter !== true) {
+    attempts.push({
+      label: "fallback adapter request",
+      options: normalizeBrowserGpuRequestAdapterOptions({
+        ...requestedOptions,
+        forceFallbackAdapter: true,
+        powerPreference: undefined
+      })
+    });
+  }
+
+  const seenKeys = new Set<string>();
+
+  return attempts.filter((attempt) => {
+    const key = getBrowserGpuRequestAdapterAttemptKey(attempt.options);
+
+    if (seenKeys.has(key)) {
+      return false;
+    }
+
+    seenKeys.add(key);
+    return true;
+  });
+}
+
+export async function requestBrowserGpuAdapterWithFallback(
+  requestAdapter: BrowserGpu["requestAdapter"],
+  options?: BrowserGpuRequestAdapterOptions,
+  userAgent = getBrowserUserAgent()
+): Promise<BrowserGpuRequestAdapterResult> {
+  const attempts = getBrowserGpuRequestAdapterAttempts(options);
+  const failures: string[] = [];
+  const runtimeAttemptKeys = new Set<string>();
+  let firstThrownError: unknown | null = null;
+  let sawNullAdapter = false;
+
+  for (const attempt of attempts) {
+    const requestOptions = sanitizeBrowserGpuRequestAdapterOptions(attempt.options, userAgent);
+    const runtimeAttemptKey = getBrowserGpuRequestAdapterAttemptKey(requestOptions);
+
+    if (runtimeAttemptKeys.has(runtimeAttemptKey)) {
+      continue;
+    }
+
+    runtimeAttemptKeys.add(runtimeAttemptKey);
+
+    try {
+      const adapter = await requestAdapter(requestOptions);
+
+      if (adapter) {
+        return {
+          adapter,
+          diagnostic: attempt === attempts[0]
+            ? null
+            : `Browser WebGPU adapter recovered with ${attempt.label}.`,
+          thrownError: null
+        };
+      }
+
+      sawNullAdapter = true;
+      failures.push(`${attempt.label}: no adapter`);
+    } catch (error) {
+      if (firstThrownError === null) {
+        firstThrownError = error;
+      }
+
+      failures.push(`${attempt.label}: ${getRawErrorMessage(error)}`);
+    }
+  }
+
+  return {
+    adapter: null,
+    diagnostic: failures.length > 0
+      ? `Browser WebGPU adapter attempts failed: ${failures.join("; ")}`
+      : null,
+    thrownError: sawNullAdapter ? null : firstThrownError
+  };
+}
+
+function installBrowserGpuRequestAdapterFallback(
+  onDiagnostic: (detail: string) => void
+): (() => void) | null {
+  const gpu = getBrowserGpu();
+
+  if (!gpu) {
+    return null;
+  }
+
+  const originalRequestAdapter = gpu.requestAdapter.bind(gpu);
+  const previousDescriptor = Object.getOwnPropertyDescriptor(gpu, "requestAdapter");
+
+  const wrappedRequestAdapter: BrowserGpu["requestAdapter"] = async (options) => {
+    const result = await requestBrowserGpuAdapterWithFallback(originalRequestAdapter, options);
+
+    if (result.diagnostic) {
+      onDiagnostic(result.diagnostic);
+    }
+
+    if (result.thrownError) {
+      throw result.thrownError;
+    }
+
+    return result.adapter;
+  };
+
+  try {
+    Object.defineProperty(gpu, "requestAdapter", {
+      configurable: true,
+      writable: true,
+      value: wrappedRequestAdapter
+    });
+  } catch {
+    return null;
+  }
+
+  return () => {
+    if (previousDescriptor) {
+      Object.defineProperty(gpu, "requestAdapter", previousDescriptor);
+      return;
+    }
+
+    delete (gpu as { requestAdapter?: BrowserGpu["requestAdapter"] }).requestAdapter;
+  };
+}
+
+async function probeBrowserWebGpu(): Promise<BrowserWebGpuProbeResult> {
   const gpu = getBrowserGpu();
 
   if (!gpu) {
     return {
-      issue: getMissingWebGpuIssue(),
-      phase: "unsupported"
+      blockingFailure: {
+        issue: getMissingWebGpuIssue(),
+        phase: "unsupported"
+      },
+      startupDiagnostic: null
     };
   }
 
-  try {
-    const adapter = await gpu.requestAdapter();
-
-    if (adapter) {
-      return {
-        issue: null,
-        phase: null
-      };
-    }
-
-    return {
-      issue: getUnavailableAdapterIssue("Browser WebGPU probe returned no adapter."),
-      phase: "unsupported"
-    };
-  } catch (error) {
-    const failureState = getStartupFailureState(error);
-
-    return {
-      issue: failureState.issue,
-      phase: failureState.phase
-    };
-  }
+  return {
+    blockingFailure: null,
+    startupDiagnostic: null
+  };
 }
 
-function getStartupFailureState(error: unknown): {
-  issue: ViewportIssue;
-  phase: Extract<ViewportPhase, "unsupported" | "error">;
-} {
+function getStartupFailureState(error: unknown, startupDiagnostic?: string | null): StartupFailure {
   const message = getRawErrorMessage(error);
+  const startupDetail = startupDiagnostic ?? null;
 
   if (isPayloadMismatchMessage(message)) {
     return {
@@ -150,14 +424,14 @@ function getStartupFailureState(error: unknown): {
 
   if (isNoAdapterFailure) {
     return {
-      issue: getUnavailableAdapterIssue(message),
+      issue: getUnavailableAdapterIssue(),
       phase: "unsupported"
     };
   }
 
   return {
     issue: {
-      detail: message,
+      detail: mergeIssueDetail(message, startupDetail),
       summary: "The wasm renderer threw before the first frame could be drawn.",
       typeLabel: "3D renderer startup failed"
     },
@@ -222,9 +496,12 @@ export default function ThreeDViewport({
   selection,
   selectionLabel,
   visibilityMode,
-  onChangeVisibilityMode
+  onChangeVisibilityMode,
+  onOpenFreshWindow,
+  onPickSpace
 }: ThreeDViewportProps) {
   const scene = buildSpaceScenePayload(project, { activeLevelId, selection, visibilityMode });
+  const visiblePrisms = getVisibleSpacePrisms(project, { activeLevelId, selection, visibilityMode });
   const [phase, setPhase] = useState<ViewportPhase>(scene.hasVisibleItems ? "loading" : "empty");
   const [issue, setIssue] = useState<ViewportIssue | null>(null);
   const [camera, setCamera] = useState<OrbitCamera>(() => getDefaultOrbitCamera(scene));
@@ -232,7 +509,15 @@ export default function ThreeDViewport({
   const surfaceRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const rendererRef = useRef<RendererHandle | null>(null);
-  const dragRef = useRef<{ pointerId: number; mode: DragMode; lastX: number; lastY: number } | null>(null);
+  const dragRef = useRef<{
+    pointerId: number;
+    mode: DragMode;
+    startX: number;
+    startY: number;
+    lastX: number;
+    lastY: number;
+    moved: boolean;
+  } | null>(null);
   const hasFitVisibleSceneRef = useRef(false);
   const previousVisibilityModeRef = useRef<ThreeDVisibilityMode>(visibilityMode);
   const errorRecoveryKeyRef = useRef<string | null>(null);
@@ -372,6 +657,8 @@ export default function ThreeDViewport({
 
   useEffect(() => {
     let isCancelled = false;
+    let startupDiagnostic: string | null = null;
+    let startupTimerId: number | null = null;
 
     if (!scene.hasVisibleItems || rendererRef.current || !canvasRef.current || phase === "unsupported") {
       return;
@@ -380,56 +667,82 @@ export default function ThreeDViewport({
     setPhase("loading");
     setIssue(null);
 
-    void (async () => {
-      try {
-        const canvas = canvasRef.current;
+    startupTimerId = window.setTimeout(() => {
+      void (async () => {
+        let restoreBrowserGpuRequestAdapter: (() => void) | null = null;
 
-        if (!canvas) {
-          return;
+        try {
+          const canvas = canvasRef.current;
+
+          if (!canvas) {
+            return;
+          }
+
+          const browserProbe = await probeBrowserWebGpu();
+
+          if (isCancelled) {
+            return;
+          }
+
+          startupDiagnostic = browserProbe.startupDiagnostic;
+
+          if (browserProbe.blockingFailure) {
+            setPhase(browserProbe.blockingFailure.phase);
+            setIssue(browserProbe.blockingFailure.issue);
+            return;
+          }
+
+          const renderWasm = await loadRenderWasmModule();
+
+          if (isCancelled) {
+            return;
+          }
+
+          restoreBrowserGpuRequestAdapter = installBrowserGpuRequestAdapterFallback((detail) => {
+            startupDiagnostic = mergeIssueDetail(startupDiagnostic, detail);
+          });
+
+          if (!restoreBrowserGpuRequestAdapter) {
+            startupDiagnostic = mergeIssueDetail(
+              startupDiagnostic,
+              "Could not install the browser WebGPU adapter fallback wrapper before renderer startup."
+            );
+          }
+
+          const renderer = await renderWasm.create_renderer(canvas);
+
+          restoreBrowserGpuRequestAdapter?.();
+          restoreBrowserGpuRequestAdapter = null;
+
+          if (isCancelled) {
+            renderer.free?.();
+            return;
+          }
+
+          rendererRef.current = renderer;
+          renderer.resize(viewportSize.width, viewportSize.height);
+          setIssue(null);
+          setPhase("ready");
+        } catch (error) {
+          if (isCancelled) {
+            return;
+          }
+
+          const failureState = getStartupFailureState(error, startupDiagnostic);
+          setPhase(failureState.phase);
+          setIssue(failureState.issue);
+        } finally {
+          restoreBrowserGpuRequestAdapter?.();
         }
-
-        const browserProbe = await probeBrowserWebGpu();
-
-        if (isCancelled) {
-          return;
-        }
-
-        if (browserProbe.issue && browserProbe.phase) {
-          setPhase(browserProbe.phase);
-          setIssue(browserProbe.issue);
-          return;
-        }
-
-        const renderWasm = await loadRenderWasmModule();
-
-        if (isCancelled) {
-          return;
-        }
-
-        const renderer = await renderWasm.create_renderer(canvas);
-
-        if (isCancelled) {
-          renderer.free?.();
-          return;
-        }
-
-        rendererRef.current = renderer;
-        renderer.resize(viewportSize.width, viewportSize.height);
-        setIssue(null);
-        setPhase("ready");
-      } catch (error) {
-        if (isCancelled) {
-          return;
-        }
-
-        const failureState = getStartupFailureState(error);
-        setPhase(failureState.phase);
-        setIssue(failureState.issue);
-      }
-    })();
+      })();
+    }, 0);
 
     return () => {
       isCancelled = true;
+
+      if (startupTimerId !== null) {
+        window.clearTimeout(startupTimerId);
+      }
     };
   }, [phase, scene.hasVisibleItems, viewportSize.height, viewportSize.width]);
 
@@ -471,8 +784,11 @@ export default function ThreeDViewport({
     dragRef.current = {
       pointerId: event.pointerId,
       mode: event.shiftKey ? "pan" : "orbit",
+      startX: event.clientX,
+      startY: event.clientY,
       lastX: event.clientX,
-      lastY: event.clientY
+      lastY: event.clientY,
+      moved: false
     };
 
     event.currentTarget.setPointerCapture(event.pointerId);
@@ -487,11 +803,13 @@ export default function ThreeDViewport({
 
     const deltaX = event.clientX - drag.lastX;
     const deltaY = event.clientY - drag.lastY;
+    const moved = drag.moved || Math.hypot(event.clientX - drag.startX, event.clientY - drag.startY) > 4;
 
     dragRef.current = {
       ...drag,
       lastX: event.clientX,
-      lastY: event.clientY
+      lastY: event.clientY,
+      moved
     };
 
     setCamera((current) => {
@@ -516,12 +834,44 @@ export default function ThreeDViewport({
   };
 
   const handlePointerUp = (event: PointerEvent<HTMLCanvasElement>) => {
-    if (dragRef.current?.pointerId === event.pointerId) {
+    const drag = dragRef.current;
+
+    if (drag?.pointerId === event.pointerId) {
       dragRef.current = null;
     }
 
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+
+    if (!drag || drag.pointerId !== event.pointerId || drag.mode !== "orbit" || drag.moved || phase !== "ready") {
+      return;
+    }
+
+    const rect = event.currentTarget.getBoundingClientRect();
+
+    if (rect.width <= 0 || rect.height <= 0) {
+      return;
+    }
+
+    const canvasX = (event.clientX - rect.left) * (event.currentTarget.width / rect.width);
+    const canvasY = (event.clientY - rect.top) * (event.currentTarget.height / rect.height);
+
+    if (canvasX < 0 || canvasX > event.currentTarget.width || canvasY < 0 || canvasY > event.currentTarget.height) {
+      return;
+    }
+
+    const pickedPrism = pickVisibleSpaceAtCanvasPoint({
+      prisms: visiblePrisms,
+      camera,
+      canvasX,
+      canvasY,
+      viewportWidth: viewportSize.width,
+      viewportHeight: viewportSize.height
+    });
+
+    if (pickedPrism) {
+      onPickSpace(pickedPrism.id);
     }
   };
 
@@ -536,6 +886,18 @@ export default function ThreeDViewport({
       ...current,
       distanceFt: clamp(current.distanceFt * Math.exp(event.deltaY * 0.0015), 6, 5000)
     }));
+  };
+
+  const handleRetryStartup = () => {
+    rendererRef.current?.free?.();
+    rendererRef.current = null;
+    dragRef.current = null;
+    setIssue(null);
+    setPhase(scene.hasVisibleItems ? "loading" : "empty");
+  };
+
+  const handleOpenChromeSystemSettings = () => {
+    openChromeSystemSettingsTab();
   };
 
   const stateTitle = phase === "loading"
@@ -561,7 +923,12 @@ export default function ThreeDViewport({
           )
           : null;
   const stateIssueType = phase === "unsupported" || phase === "error" ? issue?.typeLabel ?? null : null;
+  const stateIssueCode = phase === "unsupported" || phase === "error"
+    ? getTrappedErrorCode(issue?.summary)
+    : null;
   const stateIssueDetail = phase === "unsupported" || phase === "error" ? issue?.detail ?? null : null;
+  const showRetryStartupAction = phase === "unsupported" && stateIssueCode === "WEB-3D-002";
+  const showOpenFreshWindowAction = phase === "unsupported" && stateIssueCode === "WEB-3D-002";
 
   return (
     <div className="viewport viewport-3d">
@@ -643,8 +1010,40 @@ export default function ThreeDViewport({
           <div className="three-d-state">
             <strong>{stateTitle}</strong>
             {stateBody ? <span>{stateBody}</span> : null}
+            {stateIssueCode ? <span className="three-d-state-type">Code: {stateIssueCode}</span> : null}
             {stateIssueType ? <span className="three-d-state-type">Type: {stateIssueType}</span> : null}
             {stateIssueDetail ? <span className="three-d-state-detail">{stateIssueDetail}</span> : null}
+            {showRetryStartupAction || showOpenFreshWindowAction ? (
+              <div className="three-d-state-actions">
+                {showRetryStartupAction ? (
+                  <button
+                    type="button"
+                    className="level-manager-button three-d-state-action"
+                    onClick={handleRetryStartup}
+                  >
+                    Retry 3D Startup
+                  </button>
+                ) : null}
+                {showRetryStartupAction ? (
+                  <button
+                    type="button"
+                    className="level-manager-button three-d-state-action"
+                    onClick={handleOpenChromeSystemSettings}
+                  >
+                    Open Chrome System Settings
+                  </button>
+                ) : null}
+                {showOpenFreshWindowAction ? (
+                  <button
+                    type="button"
+                    className="level-manager-button three-d-state-action"
+                    onClick={onOpenFreshWindow}
+                  >
+                    Open 3D In New Window
+                  </button>
+                ) : null}
+              </div>
+            ) : null}
             {phase === "empty" && hasSpacesOutsideActiveLevel ? (
               <button
                 type="button"

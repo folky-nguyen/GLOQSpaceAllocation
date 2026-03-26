@@ -495,6 +495,7 @@ dd {
 .test-dashboard-header {
   align-items: start;
   cursor: grab;
+  touch-action: none;
   user-select: none;
 }
 
@@ -622,6 +623,9 @@ dd {
 
 .level-manager-header {
   align-items: start;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
 }
 
 .level-manager-header strong {
@@ -803,6 +807,12 @@ dd {
 .units-inspector-header strong {
   display: block;
   font-size: 0.88rem;
+}
+
+.units-inspector-header {
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
 }
 
 .units-inspector-header span,
@@ -1111,9 +1121,16 @@ dd {
   line-height: 1.45;
 }
 
+.three-d-state-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.45rem;
+  margin-top: 0.35rem;
+}
+
 .three-d-state-action {
   justify-self: center;
-  margin-top: 0.35rem;
 }
 
 .viewport-stats {
@@ -1218,7 +1235,7 @@ dd {
 }
 
 .site-plan-space {
-  pointer-events: none;
+  pointer-events: auto;
 }
 
 .site-plan-space .plan-space-shape {
@@ -1503,9 +1520,9 @@ dd {
 
   .units-inspector {
     width: calc(100% - 1.2rem);
-    top: 0.6rem;
-    right: 0.6rem;
-    left: 0.6rem;
+    top: 0.6rem !important;
+    right: 0.6rem !important;
+    left: 0.6rem !important;
   }
 
   .test-dashboard {
@@ -1516,9 +1533,9 @@ dd {
 
   .level-manager {
     width: calc(100% - 1.2rem);
-    top: 0.6rem;
-    right: 0.6rem;
-    left: 0.6rem;
+    top: 0.6rem !important;
+    right: 0.6rem !important;
+    left: 0.6rem !important;
   }
 
   .units-inspector-grid {

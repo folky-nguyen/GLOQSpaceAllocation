@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type RefObject } from "react";
+import type { RefObject } from "react";
+import { useDraggablePanel } from "./draggable-panel";
 import type { SampleCaseManifest } from "./test-cases";
 
 type TestDashboardProps = {
@@ -9,43 +10,10 @@ type TestDashboardProps = {
   onClose: () => void;
 };
 
-type DashboardDragState = {
-  pointerId: number;
-  offsetX: number;
-  offsetY: number;
-};
-
-type DashboardPosition = {
-  x: number;
-  y: number;
-};
-
-const INITIAL_DASHBOARD_POSITION: DashboardPosition = {
+const INITIAL_DASHBOARD_POSITION = {
   x: 22,
   y: 220
 };
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value));
-}
-
-function clampDashboardPosition(
-  position: DashboardPosition,
-  panel: HTMLElement | null,
-  workspace: HTMLElement | null
-): DashboardPosition {
-  if (!panel || !workspace) {
-    return position;
-  }
-
-  const maxX = Math.max(0, workspace.clientWidth - panel.offsetWidth);
-  const maxY = Math.max(0, workspace.clientHeight - panel.offsetHeight);
-
-  return {
-    x: clamp(position.x, 0, maxX),
-    y: clamp(position.y, 0, maxY)
-  };
-}
 
 function getActiveCaseNote(activeCase: SampleCaseManifest | null): string {
   if (!activeCase) {
@@ -62,80 +30,13 @@ export default function TestDashboard({
   onLoadCase,
   onClose
 }: TestDashboardProps) {
-  const panelRef = useRef<HTMLDivElement | null>(null);
-  const dragStateRef = useRef<DashboardDragState | null>(null);
-  const [position, setPosition] = useState<DashboardPosition>(INITIAL_DASHBOARD_POSITION);
+  const { panelRef, handleHeaderPointerDown, panelStyle } = useDraggablePanel<HTMLDivElement>(
+    workspaceRef,
+    INITIAL_DASHBOARD_POSITION
+  );
   const activeCase = activeCaseId
     ? cases.find((sampleCase) => sampleCase.id === activeCaseId) ?? null
     : null;
-
-  useEffect(() => {
-    setPosition((current) => clampDashboardPosition(current, panelRef.current, workspaceRef.current));
-  }, [workspaceRef]);
-
-  useEffect(() => {
-    const handlePointerMove = (event: PointerEvent) => {
-      const dragState = dragStateRef.current;
-      const workspace = workspaceRef.current;
-      const panel = panelRef.current;
-
-      if (!dragState || !workspace || !panel) {
-        return;
-      }
-
-      const workspaceRect = workspace.getBoundingClientRect();
-      const nextPosition = clampDashboardPosition(
-        {
-          x: event.clientX - workspaceRect.left - dragState.offsetX,
-          y: event.clientY - workspaceRect.top - dragState.offsetY
-        },
-        panel,
-        workspace
-      );
-
-      setPosition(nextPosition);
-    };
-
-    const handlePointerUp = (event: PointerEvent) => {
-      if (dragStateRef.current?.pointerId === event.pointerId) {
-        dragStateRef.current = null;
-      }
-    };
-
-    const handleWindowResize = () => {
-      setPosition((current) => clampDashboardPosition(current, panelRef.current, workspaceRef.current));
-    };
-
-    window.addEventListener("pointermove", handlePointerMove);
-    window.addEventListener("pointerup", handlePointerUp);
-    window.addEventListener("resize", handleWindowResize);
-
-    return () => {
-      window.removeEventListener("pointermove", handlePointerMove);
-      window.removeEventListener("pointerup", handlePointerUp);
-      window.removeEventListener("resize", handleWindowResize);
-    };
-  }, [workspaceRef]);
-
-  const handleHeaderPointerDown = (event: ReactPointerEvent<HTMLElement>) => {
-    const panel = panelRef.current;
-    const workspace = workspaceRef.current;
-
-    if (!panel || !workspace) {
-      return;
-    }
-
-    if (event.target instanceof HTMLElement && event.target.closest("button")) {
-      return;
-    }
-
-    const panelRect = panel.getBoundingClientRect();
-    dragStateRef.current = {
-      pointerId: event.pointerId,
-      offsetX: event.clientX - panelRect.left,
-      offsetY: event.clientY - panelRect.top
-    };
-  };
 
   return (
     <section
@@ -143,7 +44,7 @@ export default function TestDashboard({
       className="test-dashboard"
       role="dialog"
       aria-label="Test dashboard"
-      style={{ left: position.x, top: position.y }}
+      style={panelStyle}
     >
       <header className="test-dashboard-header" onPointerDown={handleHeaderPointerDown}>
         <div>

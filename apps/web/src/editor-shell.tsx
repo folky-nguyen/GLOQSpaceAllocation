@@ -1,5 +1,7 @@
-import { useEffect, useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent, type RefObject } from "react";
 import { logout, useAuth } from "./auth";
+import { useDraggablePanel } from "./draggable-panel";
+import { formatTrappedErrorMessage } from "./error-codes";
 import {
   autoGenerateLevels,
   createLevel,
@@ -14,6 +16,7 @@ import {
   getSpaceAreaSqFt,
   getSpaceBoundsFt,
   getSpaceLabelPointFt,
+  repairProjectDoc,
   getValidActiveLevelId,
   moveLevel,
   renameLevel,
@@ -61,7 +64,22 @@ type EditorState = {
   activeLevelId: string;
 };
 
+type EditorWindowHandoff = {
+  version: 1;
+  createdAtMs: number;
+  editorState: EditorState;
+  activeSampleCaseId: string | null;
+  activeView: ViewMode;
+  selection: Selection;
+  threeDVisibilityMode: ThreeDVisibilityMode;
+};
+
+const editorWindowHandoffSearchParam = "editorHandoff";
+const editorWindowHandoffStoragePrefix = "gloq-editor-handoff:";
+const editorWindowHandoffMaxAgeMs = 5 * 60 * 1000;
+
 type LevelManagerProps = {
+  workspaceRef: RefObject<HTMLElement | null>;
   project: ProjectDoc;
   activeLevelId: string;
   onClose: () => void;
@@ -240,7 +258,101 @@ function blurOnEnter(event: KeyboardEvent<HTMLInputElement>): void {
   }
 }
 
+function isViewMode(value: unknown): value is ViewMode {
+  return value === "3d" || value === "plan" || value === "site-plan";
+}
+
+function isThreeDVisibilityMode(value: unknown): value is ThreeDVisibilityMode {
+  return value === "active-floor-only" || value === "all-levels";
+}
+
+function getEditorWindowHandoffStorageKey(token: string): string {
+  return `${editorWindowHandoffStoragePrefix}${token}`;
+}
+
+function removeEditorWindowHandoffSearchParam(): void {
+  const url = new URL(window.location.href);
+
+  if (!url.searchParams.has(editorWindowHandoffSearchParam)) {
+    return;
+  }
+
+  url.searchParams.delete(editorWindowHandoffSearchParam);
+  window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+}
+
+function readEditorWindowHandoff(): EditorWindowHandoff | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  const url = new URL(window.location.href);
+  const token = url.searchParams.get(editorWindowHandoffSearchParam);
+
+  if (!token) {
+    return null;
+  }
+
+  const storageKey = getEditorWindowHandoffStorageKey(token);
+  const raw = window.localStorage.getItem(storageKey);
+
+  window.localStorage.removeItem(storageKey);
+  removeEditorWindowHandoffSearchParam();
+
+  if (!raw) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(raw) as Partial<EditorWindowHandoff> | null;
+
+    if (!parsed || parsed.version !== 1 || typeof parsed.createdAtMs !== "number") {
+      return null;
+    }
+
+    if (Date.now() - parsed.createdAtMs > editorWindowHandoffMaxAgeMs) {
+      return null;
+    }
+
+    if (!parsed.editorState || typeof parsed.editorState !== "object" || !parsed.editorState.project) {
+      return null;
+    }
+
+    const repairedProject = repairProjectDoc(parsed.editorState.project as ProjectDoc);
+    const activeView = isViewMode(parsed.activeView) ? parsed.activeView : "3d";
+    const selection = parsed.selection === null || typeof parsed.selection === "object"
+      ? parsed.selection as Selection
+      : getViewSelection(activeView);
+
+    return {
+      version: 1,
+      createdAtMs: parsed.createdAtMs,
+      editorState: {
+        project: repairedProject,
+        activeLevelId: getValidActiveLevelId(repairedProject, parsed.editorState.activeLevelId)
+      },
+      activeSampleCaseId: typeof parsed.activeSampleCaseId === "string" ? parsed.activeSampleCaseId : null,
+      activeView,
+      selection,
+      threeDVisibilityMode: isThreeDVisibilityMode(parsed.threeDVisibilityMode)
+        ? parsed.threeDVisibilityMode
+        : "active-floor-only"
+    };
+  } catch {
+    return null;
+  }
+}
+
+function createEditorWindowHandoffToken(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
 function LevelManager({
+  workspaceRef,
   project,
   activeLevelId,
   onClose,
@@ -260,6 +372,8 @@ function LevelManager({
   const [storyHeightInput, setStoryHeightInput] = useState(initialStoryHeight);
   const [defaultStoryHeightInput, setDefaultStoryHeightInput] = useState(initialStoryHeight);
   const [error, setError] = useState<string | null>(null);
+  const { panelRef, handleHeaderPointerDown, panelStyle } = useDraggablePanel<HTMLElement>(workspaceRef);
+  const displayError = formatTrappedErrorMessage(error);
 
   const handleDefaultStoryHeightCommit = (input: string) => {
     const parsedHeight = parseFeetAndInches(input);
@@ -309,8 +423,14 @@ function LevelManager({
   };
 
   return (
-    <section className="level-manager" role="dialog" aria-label="Level manager">
-      <header className="level-manager-header">
+    <section
+      ref={panelRef}
+      className="level-manager"
+      role="dialog"
+      aria-label="Level manager"
+      style={panelStyle}
+    >
+      <header className="level-manager-header" onPointerDown={handleHeaderPointerDown}>
         <div>
           <strong>Level Manager</strong>
           <span>All level math stays in internal feet.</span>
@@ -495,7 +615,7 @@ function LevelManager({
         </div>
       </section>
 
-      {error ? <p className="level-manager-error">{error}</p> : null}
+      {displayError ? <p className="level-manager-error">{displayError}</p> : null}
     </section>
   );
 }
@@ -546,12 +666,20 @@ export default function EditorShell() {
     ? sitePlanEdges[selection.edgeIndex] ?? null
     : null;
   const activeSpaces = activeLevel ? getLevelSpaces(project, activeLevel.id) : [];
-  const currentViewSpaces = activeView === "site-plan" ? sitePlanSpaces : activeSpaces;
+  const visibleThreeDSpaces = threeDVisibilityMode === "all-levels" ? project.spaces : activeSpaces;
+  const currentViewSpaces = activeView === "site-plan"
+    ? sitePlanSpaces
+    : activeView === "3d"
+      ? visibleThreeDSpaces
+      : activeSpaces;
   const grossArea = project.spaces.reduce((total, space) => total + getSpaceAreaSqFt(space), 0);
   const currentViewLabel = activeLevel ? getViewLabel(activeView, activeLevel, sitePlanLevel) : "3D View";
   const selectionLabel = activeLevel
     ? getSelectionLabel(selection, activeLevel, sitePlanLevel, selectedSiteEdge, selectedLevel, selectedSpaces, activeView)
     : "None";
+  const displayLogoutError = formatTrappedErrorMessage(logoutError);
+  const displaySiteSetbackError = formatTrappedErrorMessage(siteSetbackError);
+  const displaySiteFootprintError = formatTrappedErrorMessage(siteFootprintResult.error);
   const userEmail = auth.user?.email ?? "Signed in";
   const floorPlanBounds = getPlanBounds(activeSpaces.map((space) => space.footprint));
   const floorPlanWidth = floorPlanBounds.width * planScalePx;
@@ -575,6 +703,22 @@ export default function EditorShell() {
       ));
     }
   }, [activeLevelId, editorState.activeLevelId]);
+
+  useEffect(() => {
+    const handoff = readEditorWindowHandoff();
+
+    if (!handoff) {
+      return;
+    }
+
+    setEditorState(handoff.editorState);
+    setActiveSampleCaseId(handoff.activeSampleCaseId);
+    setThreeDVisibilityMode(handoff.threeDVisibilityMode);
+    setActiveView(handoff.activeView);
+    setSelection(handoff.selection);
+    setShowSelectMenu(false);
+    setSiteSetbackError(null);
+  }, [setActiveView, setSelection]);
 
   useEffect(() => {
     const handlePointerDown = (event: PointerEvent) => {
@@ -607,6 +751,8 @@ export default function EditorShell() {
       return;
     }
 
+    const visibleSelectionSpaceIdSet = new Set(currentViewSpaces.map((space) => space.id));
+
     if (selection.kind === "site-edge") {
       if (activeView !== "site-plan" || !selectedSiteEdge) {
         setSelection(getViewSelection(activeView));
@@ -623,7 +769,7 @@ export default function EditorShell() {
     if (selection.kind === "element" && selection.element.kind === "space") {
       const space = project.spaces.find((item) => item.id === selection.element.id);
 
-      if (!space || space.levelId !== activeLevel.id) {
+      if (!space || !visibleSelectionSpaceIdSet.has(space.id)) {
         setSelection(getViewSelection(activeView));
       }
 
@@ -637,14 +783,14 @@ export default function EditorShell() {
         }
 
         const space = project.spaces.find((item) => item.id === element.id);
-        return Boolean(space && space.levelId === activeLevel.id);
+        return Boolean(space && visibleSelectionSpaceIdSet.has(space.id));
       });
 
       if (visibleElements.length !== selection.elements.length) {
         setSelection(createSelectionFromElements(visibleElements, getViewSelection(activeView)));
       }
     }
-  }, [activeLevel, activeView, project, selectedSiteEdge, selection, setSelection]);
+  }, [activeLevel, activeView, currentViewSpaces, project, selectedSiteEdge, selection, setSelection]);
 
   if (!activeLevel) {
     return null;
@@ -719,9 +865,52 @@ export default function EditorShell() {
     setShowSelectMenu(false);
   };
 
+  const handleSpaceSelection = (view: ViewMode, spaceId: string) => {
+    setActiveView(view);
+    setSelection(toggleSpaceSelection(selection, spaceId, getViewSelection(view)));
+  };
+
   const handlePlanSpaceSelection = (spaceId: string) => {
-    setActiveView("plan");
-    setSelection(toggleSpaceSelection(selection, spaceId, getViewSelection("plan")));
+    handleSpaceSelection("plan", spaceId);
+  };
+
+  const handleSitePlanSpaceSelection = (spaceId: string) => {
+    handleSpaceSelection("site-plan", spaceId);
+  };
+
+  const handleThreeDSpaceSelection = (spaceId: string) => {
+    handleSpaceSelection("3d", spaceId);
+  };
+
+  const handleOpenFreshThreeDWindow = () => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const token = createEditorWindowHandoffToken();
+    const payload: EditorWindowHandoff = {
+      version: 1,
+      createdAtMs: Date.now(),
+      editorState: {
+        project,
+        activeLevelId
+      },
+      activeSampleCaseId,
+      activeView: "3d",
+      selection,
+      threeDVisibilityMode
+    };
+
+    try {
+      window.localStorage.setItem(getEditorWindowHandoffStorageKey(token), JSON.stringify(payload));
+    } catch {
+      return;
+    }
+
+    const url = new URL(window.location.href);
+    url.pathname = "/editor";
+    url.searchParams.set(editorWindowHandoffSearchParam, token);
+    window.open(url.toString(), "_blank", "noopener");
   };
 
   const handleSiteEdgeSelection = (edgeIndex: number) => {
@@ -960,7 +1149,7 @@ export default function EditorShell() {
             >
               {logoutPending ? "Logging out..." : "Log out"}
             </button>
-            {logoutError ? <span className="ribbon-error">{logoutError}</span> : null}
+            {displayLogoutError ? <span className="ribbon-error">{displayLogoutError}</span> : null}
           </div>
         </div>
       </header>
@@ -1021,8 +1210,8 @@ export default function EditorShell() {
                   Edge {selectedSiteEdge.index + 1} on {sitePlanLevel?.name ?? "the site"} updates the derived building footprint.
                 </p>
 
-                {siteSetbackError ? <p className="level-manager-error">{siteSetbackError}</p> : null}
-                {siteFootprintResult.error ? <p className="level-manager-error">{siteFootprintResult.error}</p> : null}
+                {displaySiteSetbackError ? <p className="level-manager-error">{displaySiteSetbackError}</p> : null}
+                {displaySiteFootprintError ? <p className="level-manager-error">{displaySiteFootprintError}</p> : null}
               </section>
             ) : null}
           </section>
@@ -1053,6 +1242,8 @@ export default function EditorShell() {
                 selectionLabel={selectionLabel}
                 visibilityMode={threeDVisibilityMode}
                 onChangeVisibilityMode={setThreeDVisibilityMode}
+                onOpenFreshWindow={handleOpenFreshThreeDWindow}
+                onPickSpace={handleThreeDSpaceSelection}
               />
             ) : activeView === "site-plan" ? (
               <div className="viewport viewport-plan">
@@ -1084,7 +1275,19 @@ export default function EditorShell() {
                           const labelPoint = getPlanLabelPosition(space, sitePlanBounds);
 
                           return (
-                            <g key={space.id} className="plan-space site-plan-space">
+                            <g
+                              key={space.id}
+                              className={`plan-space site-plan-space ${hasSelectionSpace(selection, space.id) ? "is-active" : ""}`}
+                              role="button"
+                              tabIndex={0}
+                              onClick={() => handleSitePlanSpaceSelection(space.id)}
+                              onKeyDown={(event) => {
+                                if (event.key === "Enter" || event.key === " ") {
+                                  event.preventDefault();
+                                  handleSitePlanSpaceSelection(space.id);
+                                }
+                              }}
+                            >
                               <polygon
                                 className="plan-space-shape"
                                 points={getPlanPolygonPoints(space.footprint, sitePlanBounds)}
@@ -1119,9 +1322,9 @@ export default function EditorShell() {
                         })}
                       </svg>
 
-                      {siteFootprintResult.error ? (
+                      {displaySiteFootprintError ? (
                         <div className="site-plan-banner">
-                          {siteFootprintResult.error}
+                          {displaySiteFootprintError}
                         </div>
                       ) : null}
                     </div>
@@ -1182,6 +1385,7 @@ export default function EditorShell() {
             )}
             {showLevelManager ? (
               <LevelManager
+                workspaceRef={workspaceRef}
                 project={project}
                 activeLevelId={activeLevel.id}
                 onClose={() => setShowLevelManager(false)}
@@ -1206,7 +1410,13 @@ export default function EditorShell() {
               />
             ) : null}
 
-            <UnitsInspector open={showUnitsInspector} onClose={() => setShowUnitsInspector(false)} />
+            {showUnitsInspector ? (
+              <UnitsInspector
+                open={showUnitsInspector}
+                workspaceRef={workspaceRef}
+                onClose={() => setShowUnitsInspector(false)}
+              />
+            ) : null}
           </section>
         </section>
 
@@ -1218,7 +1428,7 @@ export default function EditorShell() {
         <span>Spaces: {currentViewSpaces.length}</span>
         <span>View: {currentViewLabel}</span>
         {activeView === "3d" ? <span>3D scope: {getThreeDVisibilityModeLabel(threeDVisibilityMode)}</span> : null}
-        <span>Hint: {activeView === "site-plan" ? "Click a site edge to edit setback." : "Click spaces to add or remove them."}</span>
+        <span>Hint: {activeView === "site-plan" ? "Click spaces to select them or a site edge to edit setback." : "Click spaces to add or remove them."}</span>
         <span>Case: {activeSampleCaseId ?? "Local"}</span>
         <span>Selection: {selectionLabel}</span>
       </footer>
