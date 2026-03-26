@@ -1,46 +1,81 @@
 # KL
-
-Glossary of repo and workflow terms.
-
-## Workflow Terms
-
-- `MP.md`: the single repo map and document index. Read this first for non-bug-fix tasks.
-- `SP.md`: the architecture contract for data ownership and runtime boundaries.
-- `QC.md`: repeated user-facing regression traps.
-- `task note`: a feature note in `tasks/<number> <task name>.md`.
-- `bug note`: a bug or failure note in `tasks/FB<number> <task name>.md`.
-
-## Domain Terms
-
-- `ProjectDoc`: the canonical TypeScript document for the MVP.
-- `Level`: a vertical datum stored in the TypeScript document.
-- `Space`: a level-owned rectangular space stored in the TypeScript document.
-- `snapshot`: one versioned JSONB copy of the project document persisted to Supabase.
-
-## Runtime Terms
-
-- `activeView`: the current editor view mode, currently `plan` or `3d`.
-- `activeTool`: the current editor tool mode, currently `select`, `space`, or `level`.
-- `selection`: the current UI selection in the editor shell.
-- `auth snapshot`: the small browser-side auth state managed by `apps/web/src/auth.ts`.
-- `local auth bypass`: local-only development shortcut controlled by `VITE_LOCAL_AUTH_BYPASS` on `localhost`.
-
-## Data Terms
-
-- `canonical`: the source-of-truth representation for authored editor state.
-- `derived`: data rebuilt from the canonical document, such as render payloads or summaries.
-- `transient`: interaction-only or session-only state that should not become durable project truth.
-
-## Units Terms
-
-- `decimal feet`: the internal numeric unit used for geometry math in the MVP.
-- `feet-inch UI`: the display and input layer for imperial lengths.
-- `markerless shorthand`: unit input like `12 3 3/4` that is accepted only at the parsing boundary.
-
-## Repo Seams
-
-- `apps/web/src/`: React shell, routes, auth UI, document helpers, units, and editor state.
-- `apps/api/src/`: axum router, config, auth middleware, and HTTP error handling.
-- `crates/render-wasm/src/`: Rust wasm entry points for WebGPU work.
-- `supabase/migrations/`: durable schema for projects, members, and snapshots.
-- `setup/`: helper scripts for preview and local port-3001 control.
+Selective glossary for specialized repo and workflow concepts. Use this file for terms that affect repeated repo understanding, calculations, ownership boundaries, persistence shape, or runtime behavior. Do not use this file to list every common variable, helper, or generic framework term.
+## How To Use It
+- Add a term when the meaning is specialized, reused across files/tasks, or easy to misunderstand without repo context.
+- Skip one-off local variables, obvious names, and generic terms like `state`, `props`, or `component`.
+- `AI` describes how the current repo code behaves. Treat it as authoritative for current implementation behavior.
+- `HM` is a human-authored real-world or professional definition. Use `null` when no human definition has been provided yet.
+- If `AI` and `HM` differ, keep both. The repo may intentionally simplify a broader domain concept.
+- Update this file in the same task when a glossary-worthy concept is introduced, renamed, or changes meaning.
+## 1. Workflow Terms
+### `MP.md`
+- AI: The repo map and document index that non-bug-fix tasks read first before broader discovery or text search.
+- HM: null
+### `SP.md`
+- AI: The architecture contract that states ownership boundaries between the TypeScript editor, the Rust wasm renderer, the Rust API, and persistence.
+- HM: null
+### `task note`
+- AI: A feature note in `tasks/<number> <task name>.md` that records scope, plan, verification, and implementation status for a tracked repo change.
+- HM: null
+### `bug note`
+- AI: A bug or failure note in `tasks/FB<number> <task name>.md` that records evidence, fix scope, and verification for a bug-focused task.
+- HM: null
+## 2. Document And Domain Terms
+### `ProjectDoc`
+- AI: The canonical TypeScript project document defined in `apps/web/src/project-doc.ts`. It stores project identity, default story height, levels, spaces, and the optional site plan. Editor helpers mutate this shape and persistence stores snapshots of it.
+- HM: null
+### `Level`
+- AI: A named vertical datum stored in `ProjectDoc` with an `elevationFt` and `heightFt`. Spaces and the optional site plan reference levels by id.
+- HM: null
+### `Space`
+- AI: A level-owned named polygon footprint stored in `ProjectDoc`. Area, bounds, label points, and render geometry are derived from its footprint points.
+- HM: null
+### `SitePlan`
+- AI: An optional project-level site boundary stored in `ProjectDoc`. It carries a host `levelId`, a boundary polygon, and one setback value per edge, then gets repaired and normalized before derived-footprint calculations run.
+- HM: null
+### `site edge setback`
+- AI: The per-edge inset distance applied to a `SitePlan` boundary. The repo uses these values to offset each boundary edge inward and derive the buildable footprint polygon.
+- HM: null
+## 3. Data Semantics
+### `canonical`
+- AI: The authored source of truth owned by the TypeScript editor, currently the persisted `ProjectDoc` shape and its directly edited fields.
+- HM: null
+### `derived`
+- AI: Data rebuilt from canonical state instead of authored directly, such as polygon bounds, centroids, triangulations, site-derived footprints, and scene payloads for rendering.
+- HM: null
+### `transient`
+- AI: Session-only or interaction-only browser state that supports the editor but should not become durable project truth, such as the current view mode, selection, or auth bootstrap flags.
+- HM: null
+## 4. Geometry And Units Terms
+### `decimal feet`
+- AI: The internal numeric length unit used for geometry, level elevations, space footprints, site setbacks, and most TypeScript document calculations.
+- HM: null
+### `feet-inch UI`
+- AI: The input and display boundary where lengths are parsed from and formatted to imperial text while the underlying authored data remains in decimal feet.
+- HM: null
+### `markerless shorthand`
+- AI: The parser-only imperial input style accepted by `parseFeetAndInches(...)` without explicit `'` or `"` markers, such as `12 3 3/4` or `3 1/2`, with meaning resolved by the repo's current parser rules.
+- HM: null
+### `derived footprint`
+- AI: The buildable polygon computed from a repaired `SitePlan` boundary and its edge setbacks. It is recalculated from site data and is not stored directly in `ProjectDoc`.
+- HM: null
+## 5. Runtime And Session Terms
+### `activeView`
+- AI: The session UI mode stored in the zustand UI store. It currently switches the workspace between `plan`, `site-plan`, and `3d`.
+- HM: null
+### `selection`
+- AI: The current editor selection stored in the zustand UI store. It can point at a view, site edge, level, one space, or a multi-space set.
+- HM: null
+### `selectMode`
+- AI: The current multi-selection behavior stored in the UI store, currently `pick-many` or `sweep`.
+- HM: null
+### `auth snapshot`
+- AI: The browser-side auth store state in `apps/web/src/auth.ts`. It tracks sign-in status, current session, user, error state, pending OTP context, and password-recovery readiness.
+- HM: null
+### `local auth bypass`
+- AI: A local-development auth shortcut in `apps/web/src/auth.ts` that marks the browser as signed in when `VITE_LOCAL_AUTH_BYPASS` is `true` during local dev on `localhost` or `127.0.0.1`.
+- HM: null
+## 6. Persistence Terms
+### `snapshot`
+- AI: One versioned JSONB copy of the project document stored in `public.project_snapshots`, keyed by project id and `version_number`.
+- HM: null

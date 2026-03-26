@@ -12,12 +12,12 @@ Combined repo map and document index. This is the first lookup surface for non-b
 
 ## Workflow Docs
 
-- [AGENTS](./AGENTS.md)
-- [SP](./SP.md)
-- [KL](./KL.md)
-- [QC](./QC.md)
-- [README](./README.md)
-- [Setup README](./setup/README.md)
+- [AGENTS](./AGENTS.md): repo workflow, delivery rules, and update obligations.
+- [SP](./SP.md): architecture contract for ownership and runtime boundaries.
+- [KL](./KL.md): selective glossary for specialized repo, workflow, calculation, and runtime concepts using `AI` and `HM` entries.
+- [QC](./QC.md): repeated user-facing regression traps.
+- [README](./README.md): human-facing project intro and quick-start.
+- [Setup README](./setup/README.md): local preview helper usage and port-`3001` controls.
 
 ## Top-Level Map
 
@@ -97,6 +97,7 @@ Combined repo map and document index. This is the first lookup surface for non-b
 - `014 site plan setbacks and mixed cases.md`: add a `Site Plan` view, per-edge setbacks, and reduce validation fixtures to three mixed site/layout cases.
 - `014.01 site plan mixed case hardening.md`: patch the mixed-case footprint regression and add one small sample-data containment guard.
 - `014.02 3d adapter failure triage after 014.01.md`: treat the post-014.01 failure as a general 3D startup problem across all mixed cases, then distinguish adapter availability, generated wasm pkg, and true regressions before fixing or selectively reverting.
+- `KL001 KL glossary structure and update workflow.md`: define the selective `KL.md` glossary format, the `AI`/`HM` entry split, and the workflow rule for updating `KL.md` when new specialized concepts are introduced.
 
 ### Bug Notes
 
