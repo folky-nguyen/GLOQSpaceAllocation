@@ -54,7 +54,7 @@ Combined repo map and document index. This is the first lookup surface for non-b
 - `apps/web/src/App.tsx`: route composition and protected editor entry.
 - `apps/web/src/editor-shell.tsx`: main editor UI shell.
 - `apps/web/src/styles.css`: editor shell layout, chrome styling, and responsive breakpoint behavior.
-- `apps/web/src/auth.ts`: browser auth client and auth snapshot store.
+- `apps/web/src/auth.ts`: browser auth client and auth snapshot store, plus the temporary no-sign-in bypass used when auth is deliberately disabled for previews.
 - `apps/web/src/project-doc.ts`: current `ProjectDoc`, `Level`, and `Space` document helpers.
 - `apps/web/src/space-scene.ts`: derived 3D scene payload and default camera helpers.
 - `apps/web/src/test-cases.ts`: manifest and JSON loaders for the mixed site/level/layout validation cases.
@@ -124,7 +124,7 @@ Combined repo map and document index. This is the first lookup surface for non-b
 
 - `setup/README.md`: explain the helper scripts used for local preview and port-3001 control.
 - `setup/ensure-render-wasm.mjs`: rebuild or reuse the generated wasm package before web dev/build commands.
-- `apps/web/.env.example`: list the browser-safe Supabase and local auth env variables for the web app.
+- `apps/web/.env.example`: list the browser-safe Supabase and temporary auth-bypass env variables for the web app.
 
 ## Discovery Tips
 
