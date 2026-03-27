@@ -429,7 +429,7 @@ export function deriveSitePlanFootprint(sitePlan: SitePlan | null | undefined): 
   if (!repairedSitePlan) {
     return {
       footprint: null,
-      error: "Site boundary needs at least 3 valid points."
+      error: "Site boundary must include at least 3 valid points."
     };
   }
 
@@ -470,7 +470,7 @@ export function deriveSitePlanFootprint(sitePlan: SitePlan | null | undefined): 
   if (offsetEdges.some((edge) => !edge)) {
     return {
       footprint: null,
-      error: "Site boundary has a zero-length edge."
+      error: "Site boundary cannot contain a zero-length edge."
     };
   }
 
@@ -483,7 +483,7 @@ export function deriveSitePlanFootprint(sitePlan: SitePlan | null | undefined): 
   if (footprint.some((point) => !point || !Number.isFinite(point.xFt) || !Number.isFinite(point.yFt))) {
     return {
       footprint: null,
-      error: "Setbacks cannot resolve a valid building footprint."
+      error: "Setbacks must resolve to a valid building footprint."
     };
   }
 

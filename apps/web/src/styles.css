@@ -116,8 +116,7 @@ dd {
 
 .ribbon-brand span,
 .ribbon-summary,
-.panel-title-row span,
-.browser-row-kind {
+.panel-title-row span {
   color: #52606f;
 }
 
@@ -146,8 +145,7 @@ dd {
 }
 
 .ribbon-button,
-.view-tab,
-.browser-row {
+.view-tab {
   border: 1px solid #8f9aaa;
   background: linear-gradient(180deg, #ffffff 0%, #e0e5ec 100%);
   cursor: pointer;
@@ -160,14 +158,12 @@ dd {
 }
 
 .ribbon-button:hover,
-.view-tab:hover,
-.browser-row:hover {
+.view-tab:hover {
   background: linear-gradient(180deg, #ffffff 0%, #d7edf9 100%);
 }
 
 .ribbon-button.is-active,
 .view-tab.is-active,
-.browser-row.is-active,
 .plan-space.is-active {
   border-color: #5b86b5;
   background: linear-gradient(180deg, #ffffff 0%, #c8dff4 100%);
@@ -188,14 +184,6 @@ dd {
   position: relative;
   display: grid;
   gap: 0.18rem;
-}
-
-.select-menu-summary {
-  font-size: 0.62rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: #556575;
 }
 
 .select-menu-panel {
@@ -309,7 +297,7 @@ dd {
 
 .main-shell {
   display: grid;
-  grid-template-columns: 240px minmax(0, 1fr) 280px;
+  grid-template-columns: 240px minmax(0, 1fr);
   min-width: 0;
   min-height: 0;
   gap: 0.45rem;
@@ -330,10 +318,6 @@ dd {
 }
 
 .sidebar-left {
-  grid-template-rows: minmax(0, 1fr);
-}
-
-.sidebar-right {
   grid-template-rows: minmax(0, 1fr);
 }
 
@@ -364,14 +348,12 @@ dd {
 }
 
 .properties-panel,
-.project-browser,
 .viewport-shell {
   min-width: 0;
   min-height: 0;
 }
 
-.properties-panel,
-.project-browser {
+.properties-panel {
   overflow: auto;
 }
 
@@ -379,18 +361,15 @@ dd {
   padding: 0 0 0.7rem;
 }
 
-.property-group,
-.browser-group {
+.property-group {
   padding: 0.7rem;
 }
 
-.property-group + .property-group,
-.browser-group + .browser-group {
+.property-group + .property-group {
   border-top: 1px solid #b4bec8;
 }
 
-.property-group h3,
-.browser-group h3 {
+.property-group h3 {
   margin-bottom: 0.45rem;
   font-size: 0.66rem;
   font-weight: 700;
@@ -477,10 +456,10 @@ dd {
   left: 0.85rem;
   z-index: 6;
   display: grid;
-  gap: 0.65rem;
-  width: min(38rem, calc(100% - 1.7rem));
+  gap: 0.55rem;
+  width: min(34rem, calc(100% - 1.7rem));
   max-height: calc(100% - 1.7rem);
-  padding: 0.85rem;
+  padding: 0.75rem;
   overflow: auto;
   border: 1px solid rgba(126, 138, 152, 0.95);
   box-shadow:
@@ -516,6 +495,7 @@ dd {
 .test-dashboard-header {
   align-items: start;
   cursor: grab;
+  touch-action: none;
   user-select: none;
 }
 
@@ -638,11 +618,14 @@ dd {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.6rem;
+  gap: 0.45rem;
 }
 
 .level-manager-header {
   align-items: start;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
 }
 
 .level-manager-header strong {
@@ -659,21 +642,22 @@ dd {
 
 .level-manager-section {
   display: grid;
-  gap: 0.5rem;
-  padding: 0.65rem;
+  gap: 0.4rem;
+  padding: 0.5rem;
   border: 1px solid rgba(150, 161, 173, 0.9);
   background: rgba(244, 248, 252, 0.72);
 }
 
 .level-manager-section h3 {
-  font-size: 0.77rem;
+  margin: 0;
+  font-size: 0.76rem;
   font-weight: 700;
 }
 
 .level-manager-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.5rem;
+  gap: 0.4rem;
 }
 
 .level-manager-grid-span {
@@ -682,20 +666,22 @@ dd {
 
 .level-manager-field {
   display: grid;
-  gap: 0.28rem;
+  gap: 0.22rem;
 }
 
 .level-manager-field span {
-  font-size: 0.7rem;
+  font-size: 0.68rem;
   font-weight: 600;
   color: #4f5f70;
 }
 
 .level-manager-field input {
   width: 100%;
-  padding: 0.45rem 0.55rem;
+  padding: 0.38rem 0.45rem;
   border: 1px solid #96a4b4;
   background: rgba(255, 255, 255, 0.9);
+  font-size: 0.88rem;
+  line-height: 1.2;
 }
 
 .level-manager-button,
@@ -703,6 +689,8 @@ dd {
   border: 1px solid #8f9aaa;
   background: linear-gradient(180deg, #ffffff 0%, #e0e5ec 100%);
   cursor: pointer;
+  font-size: 0.86rem;
+  line-height: 1.2;
 }
 
 .level-manager-button:hover,
@@ -711,7 +699,7 @@ dd {
 }
 
 .level-manager-button {
-  padding: 0.28rem 0.55rem;
+  padding: 0.24rem 0.48rem;
   white-space: nowrap;
 }
 
@@ -721,14 +709,28 @@ dd {
 
 .level-manager-list {
   display: grid;
-  gap: 0.5rem;
+  gap: 0.4rem;
+}
+
+.level-list-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.9fr) 4.5rem;
+  gap: 0.4rem;
+  margin: 0 11.9rem 0 6.2rem;
+}
+
+.level-list-header span {
+  color: #4f5f70;
+  font-size: 0.68rem;
+  font-weight: 600;
 }
 
 .level-row {
   display: grid;
-  grid-template-columns: 6.2rem minmax(0, 1fr) auto;
-  gap: 0.55rem;
-  padding: 0.55rem;
+  grid-template-columns: 5.3rem minmax(0, 1fr) 11rem;
+  gap: 0.45rem;
+  padding: 0.45rem;
+  align-items: center;
   border: 1px solid rgba(164, 174, 186, 0.72);
   background: rgba(255, 255, 255, 0.72);
 }
@@ -740,7 +742,7 @@ dd {
 
 .level-row-activate {
   align-self: start;
-  padding: 0.4rem 0.5rem;
+  padding: 0.34rem 0.4rem;
 }
 
 .level-row-activate.is-active {
@@ -751,22 +753,38 @@ dd {
 
 .level-row-main {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr)) 6rem;
-  gap: 0.5rem;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.9fr) 4.5rem;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.level-row .level-manager-field span,
+.level-row .level-row-meta span {
+  display: none;
 }
 
 .level-row-meta {
   display: grid;
-  align-content: end;
-  gap: 0.18rem;
+  align-content: center;
+  gap: 0.12rem;
 }
 
 .level-row-meta strong {
-  font-size: 0.77rem;
+  font-size: 0.75rem;
 }
 
 .level-row-actions {
-  align-items: end;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  width: 11rem;
+  gap: 0.3rem;
+  align-items: stretch;
+}
+
+.level-row-actions .level-manager-button {
+  width: 100%;
+  padding-right: 0;
+  padding-left: 0;
 }
 
 .level-manager-error {
@@ -789,6 +807,12 @@ dd {
 .units-inspector-header strong {
   display: block;
   font-size: 0.88rem;
+}
+
+.units-inspector-header {
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
 }
 
 .units-inspector-header span,
@@ -1085,9 +1109,28 @@ dd {
   font-size: 0.79rem;
 }
 
+.three-d-state-type {
+  color: #ffffff;
+  font-size: 0.76rem;
+  font-weight: 600;
+}
+
+.three-d-state-detail {
+  color: rgba(191, 210, 230, 0.82);
+  font-size: 0.72rem;
+  line-height: 1.45;
+}
+
+.three-d-state-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.45rem;
+  margin-top: 0.35rem;
+}
+
 .three-d-state-action {
   justify-self: center;
-  margin-top: 0.35rem;
 }
 
 .viewport-stats {
@@ -1149,10 +1192,6 @@ dd {
   overflow: visible;
 }
 
-.plan-canvas.is-sweep-mode {
-  cursor: crosshair;
-}
-
 .plan-empty-state {
   display: grid;
   place-items: center;
@@ -1196,7 +1235,7 @@ dd {
 }
 
 .site-plan-space {
-  pointer-events: none;
+  pointer-events: auto;
 }
 
 .site-plan-space .plan-space-shape {
@@ -1243,50 +1282,6 @@ dd {
 
 .plan-space-label {
   font-weight: 700;
-}
-
-.plan-sweep-box {
-  position: absolute;
-  z-index: 3;
-  pointer-events: none;
-  border: 1px dashed #4e7fae;
-  background: rgba(120, 164, 211, 0.18);
-}
-
-.plan-sweep-box.is-add {
-  border-color: #3f7a55;
-  background: rgba(111, 177, 129, 0.18);
-}
-
-.plan-sweep-box.is-remove {
-  border-color: #9a4d44;
-  background: rgba(196, 116, 105, 0.16);
-}
-
-.project-browser {
-  padding-bottom: 0.7rem;
-}
-
-.browser-list {
-  display: grid;
-  gap: 0.32rem;
-}
-
-.browser-row {
-  display: grid;
-  grid-template-columns: 3rem minmax(0, 1fr);
-  align-items: center;
-  gap: 0.45rem;
-  padding: 0.42rem 0.5rem;
-  text-align: left;
-  font-size: 0.76rem;
-}
-
-.browser-row-kind {
-  font-size: 0.63rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
 }
 
 .status-bar {
@@ -1460,7 +1455,7 @@ dd {
   }
 
   .main-shell {
-    grid-template-columns: 220px minmax(0, 1fr) 240px;
+    grid-template-columns: 220px minmax(0, 1fr);
   }
 }
 
@@ -1479,12 +1474,6 @@ dd {
 
   .main-shell {
     grid-template-columns: 220px minmax(0, 1fr);
-    grid-template-rows: minmax(0, 1fr) 220px;
-  }
-
-  .sidebar-right {
-    grid-column: 1 / -1;
-    grid-row: 2;
   }
 }
 
@@ -1511,7 +1500,7 @@ dd {
 
   .main-shell {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: 220px minmax(0, 1fr) 220px;
+    grid-template-rows: 220px minmax(0, 1fr);
   }
 
   .sidebar-left {
@@ -1524,11 +1513,6 @@ dd {
     grid-row: 2;
   }
 
-  .sidebar-right {
-    grid-column: 1;
-    grid-row: 3;
-  }
-
   .select-menu-panel {
     left: auto;
     right: 0;
@@ -1536,9 +1520,9 @@ dd {
 
   .units-inspector {
     width: calc(100% - 1.2rem);
-    top: 0.6rem;
-    right: 0.6rem;
-    left: 0.6rem;
+    top: 0.6rem !important;
+    right: 0.6rem !important;
+    left: 0.6rem !important;
   }
 
   .test-dashboard {
@@ -1549,9 +1533,9 @@ dd {
 
   .level-manager {
     width: calc(100% - 1.2rem);
-    top: 0.6rem;
-    right: 0.6rem;
-    left: 0.6rem;
+    top: 0.6rem !important;
+    right: 0.6rem !important;
+    left: 0.6rem !important;
   }
 
   .units-inspector-grid {
@@ -1564,11 +1548,24 @@ dd {
     grid-template-columns: minmax(0, 1fr);
   }
 
+  .level-list-header {
+    display: none;
+  }
+
+  .level-row .level-manager-field span,
+  .level-row .level-row-meta span {
+    display: block;
+  }
+
   .level-manager-header,
   .level-manager-header-actions,
   .level-manager-title-row,
   .level-row-actions {
     flex-wrap: wrap;
+  }
+
+  .level-row-actions {
+    width: 100%;
   }
 
   .viewport-overlay-top {

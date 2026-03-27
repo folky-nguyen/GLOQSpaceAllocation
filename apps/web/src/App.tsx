@@ -9,6 +9,7 @@ import {
   useAuth,
   verifyEmailOtp
 } from "./auth";
+import { formatTrappedErrorMessage } from "./error-codes";
 import EditorShell from "./editor-shell";
 
 type AuthMode = "login" | "signup" | "recovery";
@@ -294,7 +295,7 @@ function LoginPage() {
     setAction(null);
   };
 
-  const displayError = localError ?? auth.error;
+  const displayError = formatTrappedErrorMessage(localError ?? auth.error);
 
   const copyByMode: Record<AuthMode, { title: string; body: string }> = {
     login: {

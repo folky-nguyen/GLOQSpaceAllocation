@@ -82,7 +82,13 @@ function setSnapshot(updater: AuthSnapshot | ((current: AuthSnapshot) => AuthSna
 }
 
 function getErrorMessage(error: { message?: string } | null | undefined, fallback: string): string {
-  return error?.message?.trim() || fallback;
+  const detail = error?.message?.trim();
+
+  if (!detail || detail === fallback) {
+    return fallback;
+  }
+
+  return `${fallback} Detail: ${detail}`;
 }
 
 function getBrowserRedirectUrl(path: "/login" | "/editor" = "/login"): string | undefined {
@@ -106,7 +112,7 @@ function getSupabaseClient(): { client: SupabaseClient | null; error: string | n
   const publishableKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY?.trim();
 
   if (!url || !publishableKey) {
-    clientError = "Missing VITE_SUPABASE_URL or VITE_SUPABASE_PUBLISHABLE_KEY.";
+    clientError = "Supabase browser auth is not configured. Add VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY.";
     return { client: null, error: clientError };
   }
 
@@ -213,7 +219,7 @@ export async function bootstrapAuth(): Promise<void> {
       setSnapshot((current) => ({
         ...current,
         status: "signed_out",
-        error: getErrorMessage(error, "Unable to restore the current session."),
+        error: getErrorMessage(error, "Could not restore the current session."),
         session: null,
         user: null,
         recoveryReady: false
@@ -250,7 +256,7 @@ export async function signInWithPassword(email: string, password: string): Promi
   const { data, error } = await clientResult.client.auth.signInWithPassword({ email, password });
 
   if (error || !data.session) {
-    const message = "Unable to sign in with email and password.";
+    const message = getErrorMessage(error, "Could not sign in with email and password.");
     setSnapshot((current) => ({
       ...current,
       status: "signed_out",
@@ -294,7 +300,7 @@ export async function signUpWithPassword(email: string, password: string): Promi
   });
 
   if (error) {
-    const message = getErrorMessage(error, "Unable to create the account.");
+    const message = getErrorMessage(error, "Could not create the account.");
     setSnapshot((current) => ({
       ...current,
       status: "signed_out",
@@ -339,7 +345,7 @@ export async function sendRecoveryEmail(email: string): Promise<{ error: string 
   );
 
   if (error) {
-    const message = getErrorMessage(error, "Unable to send the recovery email.");
+    const message = getErrorMessage(error, "Could not send the recovery email.");
     setSnapshot((current) => ({
       ...current,
       status: "signed_out",
@@ -379,8 +385,8 @@ export async function verifyEmailOtp(
 
   if (error) {
     const fallback = type === "recovery"
-      ? "Unable to verify the recovery code."
-      : "Unable to verify the email code.";
+      ? "Could not verify the recovery code."
+      : "Could not verify the email code.";
     const message = getErrorMessage(error, fallback);
     setSnapshot((current) => ({
       ...current,
@@ -392,7 +398,7 @@ export async function verifyEmailOtp(
 
   if (type === "recovery") {
     if (!data.session) {
-      const message = "Unable to open the password reset session.";
+      const message = "Could not open the password reset session.";
       setSnapshot((current) => ({
         ...current,
         status: "signed_out",
@@ -444,7 +450,7 @@ export async function updatePassword(password: string): Promise<{ error: string 
   const { error } = await clientResult.client.auth.updateUser({ password });
 
   if (error) {
-    const message = getErrorMessage(error, "Unable to update the password.");
+    const message = getErrorMessage(error, "Could not update the password.");
     setSnapshot((current) => ({
       ...current,
       error: message
@@ -455,7 +461,7 @@ export async function updatePassword(password: string): Promise<{ error: string 
   const signOutResult = await clientResult.client.auth.signOut();
 
   if (signOutResult.error) {
-    const message = getErrorMessage(signOutResult.error, "Password updated, but sign-out failed.");
+    const message = getErrorMessage(signOutResult.error, "Password updated, but could not sign out.");
     setSnapshot((current) => ({
       ...current,
       error: message
@@ -489,7 +495,7 @@ export async function logout(): Promise<{ error: string | null }> {
   const { error } = await clientResult.client.auth.signOut();
 
   if (error) {
-    const message = getErrorMessage(error, "Unable to log out.");
+    const message = getErrorMessage(error, "Could not sign out.");
     setSnapshot((current) => ({
       ...current,
       error: message

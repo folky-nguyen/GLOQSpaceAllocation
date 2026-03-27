@@ -2,6 +2,11 @@
   "name": "gloq-space-allocation",
   "private": true,
   "packageManager": "pnpm@10.32.1",
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
+  },
   "scripts": {
     "dev:web": "corepack pnpm --filter web dev",
     "dev:3001": "corepack pnpm --filter web dev:3001",
