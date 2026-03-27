@@ -23,7 +23,7 @@ Glossary of repo and workflow terms.
 - `activeTool`: the current editor tool mode, currently `select`, `space`, or `level`.
 - `selection`: the current UI selection in the editor shell.
 - `auth snapshot`: the small browser-side auth state managed by `apps/web/src/auth.ts`.
-- `auth bypass`: browser-side shortcut controlled by `VITE_LOCAL_AUTH_BYPASS` that opens `/editor` directly when temporarily disabling sign-in, including deployed previews.
+- `auth bypass`: browser-side shortcut in `apps/web/src/auth.ts` that opens `/editor` directly when `VITE_LOCAL_AUTH_BYPASS=true` or when Supabase browser auth env vars are intentionally omitted for a temporary no-sign-in deployment.
 
 ## Data Terms
 

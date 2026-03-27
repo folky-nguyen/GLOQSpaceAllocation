@@ -82,6 +82,7 @@ Current browser-safe web vars:
 - `VITE_SUPABASE_PUBLISHABLE_KEY`
 - `VITE_LOCAL_AUTH_BYPASS`
   - temporary browser-side bypass for opening `/editor` directly in local or deployed client builds
+  - if the Supabase browser vars are omitted entirely, the web app now also falls back to direct workspace access instead of showing the sign-in screen
 
 API env currently expects:
 

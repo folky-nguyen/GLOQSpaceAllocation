@@ -31,9 +31,20 @@ let clientError: string | null = null;
 let bootstrapPromise: Promise<void> | null = null;
 let authSubscription: { unsubscribe: () => void } | null = null;
 
+function hasSupabaseBrowserAuthConfig(): boolean {
+  return Boolean(
+    import.meta.env.VITE_SUPABASE_URL?.trim()
+    && import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY?.trim()
+  );
+}
+
 // Browser-safe temporary bypass for demos or deployed previews that should open the workspace directly.
 function isAuthBypassed(): boolean {
-  return import.meta.env.VITE_LOCAL_AUTH_BYPASS?.trim().toLowerCase() === "true";
+  if (import.meta.env.VITE_LOCAL_AUTH_BYPASS?.trim().toLowerCase() === "true") {
+    return true;
+  }
+
+  return !hasSupabaseBrowserAuthConfig();
 }
 
 function getBypassUser(): User {
