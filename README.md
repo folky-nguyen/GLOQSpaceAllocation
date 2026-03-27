@@ -81,7 +81,7 @@ Current browser-safe web vars:
 - `VITE_SUPABASE_URL`
 - `VITE_SUPABASE_PUBLISHABLE_KEY`
 - `VITE_LOCAL_AUTH_BYPASS`
-  - local-only convenience for opening `/editor` directly on `localhost` during development
+  - temporary browser-side bypass for opening `/editor` directly in local or deployed client builds
 
 API env currently expects:
 

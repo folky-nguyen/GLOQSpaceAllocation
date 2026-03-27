@@ -31,38 +31,27 @@ let clientError: string | null = null;
 let bootstrapPromise: Promise<void> | null = null;
 let authSubscription: { unsubscribe: () => void } | null = null;
 
-function isLocalDevAuthBypassed(): boolean {
-  if (!import.meta.env.DEV) {
-    return false;
-  }
-
-  if (import.meta.env.VITE_LOCAL_AUTH_BYPASS?.trim().toLowerCase() !== "true") {
-    return false;
-  }
-
-  if (typeof window === "undefined") {
-    return true;
-  }
-
-  return window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+// Browser-safe temporary bypass for demos or deployed previews that should open the workspace directly.
+function isAuthBypassed(): boolean {
+  return import.meta.env.VITE_LOCAL_AUTH_BYPASS?.trim().toLowerCase() === "true";
 }
 
-function getLocalDevUser(): User {
+function getBypassUser(): User {
   return {
-    id: "local-dev-user",
+    id: "auth-bypass-user",
     app_metadata: { provider: "email" },
-    user_metadata: { name: "Local Dev" },
+    user_metadata: { name: "Workspace Bypass" },
     aud: "authenticated",
     created_at: "1970-01-01T00:00:00.000Z",
-    email: "local-dev@gloq.local"
+    email: "workspace-bypass@gloq.local"
   } as User;
 }
 
-function applyLocalDevBypass() {
+function applyAuthBypass() {
   setSnapshot({
     status: "signed_in",
     session: null,
-    user: getLocalDevUser(),
+    user: getBypassUser(),
     error: null,
     pendingEmail: "",
     pendingOtpType: null,
@@ -177,8 +166,8 @@ export async function bootstrapAuth(): Promise<void> {
   }
 
   bootstrapPromise = (async () => {
-    if (isLocalDevAuthBypassed()) {
-      applyLocalDevBypass();
+    if (isAuthBypassed()) {
+      applyAuthBypass();
       return;
     }
 
@@ -228,8 +217,8 @@ export async function bootstrapAuth(): Promise<void> {
 }
 
 export async function signInWithPassword(email: string, password: string): Promise<{ error: string | null }> {
-  if (isLocalDevAuthBypassed()) {
-    applyLocalDevBypass();
+  if (isAuthBypassed()) {
+    applyAuthBypass();
     return { error: null };
   }
 
@@ -267,8 +256,8 @@ export async function signInWithPassword(email: string, password: string): Promi
 }
 
 export async function signUpWithPassword(email: string, password: string): Promise<{ error: string | null }> {
-  if (isLocalDevAuthBypassed()) {
-    applyLocalDevBypass();
+  if (isAuthBypassed()) {
+    applyAuthBypass();
     return { error: null };
   }
 
@@ -313,8 +302,8 @@ export async function signUpWithPassword(email: string, password: string): Promi
 }
 
 export async function sendRecoveryEmail(email: string): Promise<{ error: string | null }> {
-  if (isLocalDevAuthBypassed()) {
-    applyLocalDevBypass();
+  if (isAuthBypassed()) {
+    applyAuthBypass();
     return { error: null };
   }
 
@@ -357,8 +346,8 @@ export async function verifyEmailOtp(
   token: string,
   type: PendingOtpType
 ): Promise<{ error: string | null }> {
-  if (isLocalDevAuthBypassed()) {
-    applyLocalDevBypass();
+  if (isAuthBypassed()) {
+    applyAuthBypass();
     return { error: null };
   }
 
@@ -423,8 +412,8 @@ export async function verifyEmailOtp(
 }
 
 export async function updatePassword(password: string): Promise<{ error: string | null }> {
-  if (isLocalDevAuthBypassed()) {
-    applyLocalDevBypass();
+  if (isAuthBypassed()) {
+    applyAuthBypass();
     return { error: null };
   }
 
@@ -468,8 +457,8 @@ export async function updatePassword(password: string): Promise<{ error: string 
 }
 
 export async function logout(): Promise<{ error: string | null }> {
-  if (isLocalDevAuthBypassed()) {
-    applyLocalDevBypass();
+  if (isAuthBypassed()) {
+    applyAuthBypass();
     return { error: null };
   }
 

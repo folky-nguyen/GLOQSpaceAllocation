@@ -107,7 +107,7 @@ Combined repo map and document index. This is the first lookup surface for non-b
 
 - `setup/README.md`: explain the helper scripts used for local preview and port-3001 control.
 - `setup/ensure-render-wasm.mjs`: rebuild or reuse the generated wasm package before web dev/build commands.
-- `apps/web/.env.example`: list the browser-safe Supabase and local auth env variables for the web app.
+- `apps/web/.env.example`: list the browser-safe Supabase and temporary auth-bypass env variables for the web app.
 
 ## Discovery Tips
 
