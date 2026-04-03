@@ -1,0 +1,4927 @@
+{
+  "metadata": {
+    "name": "Apartment Layout Engine Assumptions v25",
+    "engine_version": "v25",
+    "units": "feet unless otherwise noted",
+    "notes": [
+      "v25 extends v24 with a progressive multi-pass solve orchestrator instead of relying on room/3D passes as isolated additions.",
+      "The orchestrator is coarse-to-fine, topology-first, geometry-later, selective-refinement, lazy-exactness, and bounded-repair.",
+      "v25 adds pass execution, trigger-based escalation, confidence stopping, dirty-region exactification, representative solving, and hotspot 3D gating.",
+      "v25 still does not claim a full arbitrary exact polygon or full-building exact 3D solver; those remain routed to v26."
+    ],
+    "version": "v25"
+  },
+  "source_policy": {
+    "active_semantic_source_sheets": [
+      "DE OVERRIDE",
+      "APT CA1",
+      "APT CA2",
+      "APT Space"
+    ],
+    "cross_check_only_sheets": [
+      "APT SA",
+      "APT MT",
+      "Gensler MEP "
+    ],
+    "excluded_sheets": [
+      "APT Logic",
+      "APT PF",
+      "APT OpEx",
+      "APT CC (N)",
+      "APT CC (R)",
+      "Testing Model",
+      "PF - ED",
+      "PF - ED - Variables",
+      "Zip Data",
+      "Code Data",
+      "Cost Data",
+      "DATA INPUT",
+      "DATA SOURCE"
+    ],
+    "inheritance_priority": [
+      "user_override",
+      "formula_family",
+      "assumption_default"
+    ],
+    "policy_notes": [
+      "APT CA2 is used for geometry/BOM-oriented inheritance when it adds vertical or support-space detail not explicit in APT CA1.",
+      "APT MT and Gensler MEP are not direct drivers of apartment geometry; they are cross-check sources for downstream demand factors."
+    ],
+    "excluded_runtime_sources": [
+      "APT Logic"
+    ]
+  },
+  "override_policy": {
+    "value_flow": "base_value = formula or assumption; resolved_value = user_override if apply=true else base_value",
+    "recompute_strategy": "phase_forward_recompute_from_earliest_affected_phase",
+    "phase_order": [
+      "input_normalization",
+      "massing_targets",
+      "program_targets",
+      "vertical_system",
+      "floor_zoning",
+      "space_layout",
+      "output_assembly"
+    ]
+  },
+  "shape_coverage": {
+    "bar": 0.52,
+    "l_shape": 0.58,
+    "u_shape": 0.63,
+    "o_shape": 0.72,
+    "h_shape": 0.6,
+    "tower": 0.34,
+    "x_shape": 0.4,
+    "cluster": 0.48,
+    "free_form": 0.5,
+    "perimeter_partial": 0.68
+  },
+  "construction_multipliers": {
+    "type_v": 0.95,
+    "type_iii": 1.0,
+    "type_v_over_i": 1.06,
+    "type_iii_over_i": 1.08,
+    "type_i": 1.12
+  },
+  "geometry": {
+    "site_inset_ft": 8.0,
+    "template_snap_ft": 2.0,
+    "polygon_snap_ft": 1.0,
+    "daylight_depth_cap_ft": 38.0,
+    "unit_rect_min_width_ft": 14.0,
+    "unit_rect_min_depth_ft": 18.0,
+    "service_belt_depth_ft": 4.0,
+    "wall_loss_ratio": 0.08,
+    "min_courtyard_width_ft": 40.0,
+    "min_wing_width_ft": 28.0,
+    "layer_resolution_ft": [
+      8.0,
+      4.0,
+      2.0,
+      1.0
+    ],
+    "corridor_wall_thickness_in": 8.0,
+    "typical_floor_similarity_threshold": 0.82
+  },
+  "unit_typology": {
+    "default_quantile_by_objective": {
+      "maximize_far": 0.4,
+      "maximize_dwelling_units": 0.18,
+      "maximize_balanced_yield": 0.52
+    },
+    "wd_area_adjustment_if_no_in_unit_wd_sf": {
+      "min_area_delta": -10.0,
+      "max_area_delta": -25.0
+    },
+    "canonical_bands": {
+      "studio": {
+        "min_area_sf": 450.0,
+        "target_area_sf": 500.0,
+        "max_area_sf": 650.0,
+        "depth_over_width_min": 1.5,
+        "depth_over_width_max": 2.0
+      },
+      "one_bedroom": {
+        "min_area_sf": 550.0,
+        "target_area_sf": 650.0,
+        "max_area_sf": 800.0,
+        "depth_over_width_min": 1.1,
+        "depth_over_width_max": 1.2
+      },
+      "two_bedroom": {
+        "min_area_sf": 950.0,
+        "target_area_sf": 1050.0,
+        "max_area_sf": 1150.0,
+        "depth_over_width_min": 0.5,
+        "depth_over_width_max": 0.8
+      },
+      "three_bedroom": {
+        "min_area_sf": 1180.0,
+        "target_area_sf": 1300.0,
+        "max_area_sf": 1400.0,
+        "depth_over_width_min": 0.65,
+        "depth_over_width_max": 0.7
+      }
+    },
+    "alternate_variants": {
+      "two_bedroom_one_bath": {
+        "min_area_sf": 800.0,
+        "target_area_sf": 930.0,
+        "max_area_sf": 1100.0
+      },
+      "two_bedroom_two_bath_powder": {
+        "min_area_sf": 1050.0,
+        "target_area_sf": 1150.0,
+        "max_area_sf": 1250.0
+      },
+      "three_bedroom_two_bath_powder": {
+        "min_area_sf": 1200.0,
+        "target_area_sf": 1320.0,
+        "max_area_sf": 1480.0
+      }
+    },
+    "minimum_facade_contact_ft": 8.0,
+    "preferred_corner_bonus_sf": 35.0
+  },
+  "economic_solver_defaults": {
+    "revenue_years": 10.0,
+    "vacancy_months_per_year": 1.0,
+    "efficiency_weight": 0.6,
+    "rent_per_sf_by_type": {
+      "studio": 3.45,
+      "one_bedroom": 3.35,
+      "two_bedroom": 3.2,
+      "three_bedroom": 3.1
+    },
+    "construction_cost_sf_by_type": {
+      "studio": 330.0,
+      "one_bedroom": 325.0,
+      "two_bedroom": 320.0,
+      "three_bedroom": 318.0
+    }
+  },
+  "corridor_and_core": {
+    "preferred_residential_corridor_ft": 6.0,
+    "internal_corridor_ft": 8.0,
+    "single_loaded_corridor_ft": 6.0,
+    "perimeter_corridor_ft": 7.0,
+    "elevator_lobby_width_min_ft": 8.0,
+    "elevator_lobby_width_max_ft": 12.0,
+    "elevator_lobby_length_min_ft": 11.0,
+    "elevator_lobby_length_max_ft": 12.0,
+    "entry_lobby_sf_per_unit_low_mid": 8.0,
+    "entry_lobby_sf_per_unit_high_tower": 12.0,
+    "entry_lobby_interp": {
+      "units_1": 100.0,
+      "sf_1": 750.0,
+      "units_2": 1000.0,
+      "sf_2": 3000.0
+    },
+    "entry_wind_lobby": {
+      "disable_for_affordable_profile": true,
+      "enable_min_stories_exclusive": 3,
+      "enable_min_units_exclusive": 50,
+      "qty_interp": {
+        "units_1": 100.0,
+        "qty_1": 1.0,
+        "units_2": 1000.0,
+        "qty_2": 4.0
+      },
+      "width_ft": 8.0,
+      "depth_ft": 8.0
+    }
+  },
+  "vertical_transport": {
+    "height_breaks": {
+      "low_rise_max_stories": 4,
+      "mid_rise_max_stories": 9
+    },
+    "occupant_load_factor_residential_sf_per_occ": 200.0,
+    "operations_staff_per_units": 50.0,
+    "passenger_elevator": {
+      "persons_weight_lb": 150.0,
+      "rated_load_lb_default": 3000.0,
+      "machine_room": {
+        "on_roof_default": true,
+        "freight_width_ft": 8.0,
+        "freight_depth_ft": 10.0,
+        "electric_guide": [
+          {
+            "max_rated_load_lb": 2000.0,
+            "width_ft": 7.333333333333333,
+            "depth_ft": 16.0
+          },
+          {
+            "max_rated_load_lb": 2500.0,
+            "width_ft": 8.333333333333334,
+            "depth_ft": 16.0
+          },
+          {
+            "max_rated_load_lb": 3000.0,
+            "width_ft": 8.333333333333334,
+            "depth_ft": 16.0
+          },
+          {
+            "max_rated_load_lb": 3500.0,
+            "width_ft": 8.333333333333334,
+            "depth_ft": 16.0
+          },
+          {
+            "max_rated_load_lb": 4000.0,
+            "width_ft": 9.5,
+            "depth_ft": 16.0
+          }
+        ],
+        "hydraulic_guide": [
+          {
+            "max_rated_load_lb": 2000.0,
+            "width_ft": 7.333333333333333,
+            "depth_ft": 7.578947368421052
+          },
+          {
+            "max_rated_load_lb": 2500.0,
+            "width_ft": 8.333333333333334,
+            "depth_ft": 7.578947368421052
+          },
+          {
+            "max_rated_load_lb": 3000.0,
+            "width_ft": 8.333333333333334,
+            "depth_ft": 7.578947368421052
+          },
+          {
+            "max_rated_load_lb": 3500.0,
+            "width_ft": 8.333333333333334,
+            "depth_ft": 7.578947368421052
+          },
+          {
+            "max_rated_load_lb": 4000.0,
+            "width_ft": 9.5,
+            "depth_ft": 7.578947368421052
+          }
+        ]
+      },
+      "max_car_loading_ratio": 0.65,
+      "speed_ft_per_min_default": 350.0,
+      "common_expectation_units_per_car": 80.0,
+      "handling_target_by_rise": {
+        "low_rise": 0.08,
+        "mid_rise": 0.07,
+        "high_rise": 0.06
+      },
+      "interval_target_s": {
+        "low_rise": 50.0,
+        "mid_rise": 60.0,
+        "high_rise_upto_19": 50.0,
+        "high_rise_20_plus": 45.0
+      },
+      "hydraulic_hoistway_clear_depth_ft": 20.0,
+      "wall_thickness_in": 12.0
+    },
+    "wheelchair_lift": {
+      "enabled": false,
+      "stop_count": 2,
+      "landing_ewa_sf": 20.0,
+      "landing_code_min_sf": 25.0,
+      "landing_min_sf": 25.0,
+      "qty_interp": {
+        "units_1": 100.0,
+        "qty_1": 1.0,
+        "units_2": 1000.0,
+        "qty_2": 2.0
+      }
+    },
+    "freight_elevator": {
+      "zero_to_150_units": 0,
+      "up_to_300_units": 1,
+      "over_300_units": 2
+    },
+    "stairs": {
+      "riser_in": 7.0,
+      "tread_in": 11.0,
+      "min_width_in": 44.0,
+      "width_per_occ_in": 0.3,
+      "additional_stairs_default": 1,
+      "vestibule_length_min_ft": 6.0,
+      "vestibule_width_min_ft": 3.67
+    }
+  },
+  "support_spaces": {
+    "bicycle": {
+      "repair_area_sf": 100.0,
+      "repair_area_enable_long_term_threshold": 20,
+      "repair_area_interp": {
+        "units_1": 100.0,
+        "qty_1": 1.0,
+        "units_2": 1000.0,
+        "qty_2": 2.0
+      },
+      "rack_length_ft": 5.0,
+      "rack_width_ft": 2.5,
+      "rack_aisle_ft": 5.0,
+      "short_term_formula": [
+        {
+          "max_units": 25,
+          "ratio_divisor": 10.0
+        },
+        {
+          "max_units": 100,
+          "ratio_divisor": 15.0
+        },
+        {
+          "max_units": 200,
+          "ratio_divisor": 20.0
+        },
+        {
+          "max_units": null,
+          "ratio_divisor": 40.0
+        }
+      ],
+      "long_term_formula": [
+        {
+          "max_units": 25,
+          "ratio_divisor": 1.0
+        },
+        {
+          "max_units": 100,
+          "ratio_divisor": 1.5
+        },
+        {
+          "max_units": 200,
+          "ratio_divisor": 2.0
+        },
+        {
+          "max_units": null,
+          "ratio_divisor": 4.0
+        }
+      ]
+    },
+    "common_laundry": {
+      "wd_pairs_per_units": 10.0,
+      "pair_width_ft": 3.0,
+      "pair_length_ft": 7.0,
+      "pair_clearance_sf": 1.0,
+      "room_aux_interp": {
+        "units_1": 100.0,
+        "sf_1": 200.0,
+        "units_2": 1000.0,
+        "sf_2": 500.0
+      },
+      "room_min_sf": 100.0
+    },
+    "mail_and_package": {
+      "mailbox_per_unit": 1.0,
+      "locker_per_mailbox_ratio": 0.2,
+      "mailboxes_per_cabinet": 20.0,
+      "lockers_per_cabinet": 2.0,
+      "cabinet_width_in": 32.69,
+      "cabinet_depth_in": 18.0,
+      "front_clear_depth_in": 60.0,
+      "room_sf_per_du_min": 1.5,
+      "room_sf_per_du_max": 2.0
+    },
+    "storage_and_janitor": {
+      "general_storage_interp": {
+        "units_1": 100.0,
+        "qty_1": 2.0,
+        "units_2": 1000.0,
+        "qty_2": 10.0,
+        "room_w_ft": 10.0,
+        "room_d_ft": 10.0
+      },
+      "janitor_interp": {
+        "units_1": 100.0,
+        "qty_1": 4.0,
+        "units_2": 1000.0,
+        "qty_2": 12.0,
+        "room_w_ft": 6.0,
+        "room_d_ft": 6.0
+      },
+      "parcel_storage_interp": {
+        "units_1": 100.0,
+        "qty_1": 1.0,
+        "units_2": 1000.0,
+        "qty_2": 8.0,
+        "room_w_ft": 10.0,
+        "room_d_ft": 10.0
+      },
+      "cold_storage_interp": {
+        "units_1": 100.0,
+        "qty_1": 1.0,
+        "units_2": 1000.0,
+        "qty_2": 4.0,
+        "room_w_ft": 10.0,
+        "room_d_ft": 10.0
+      }
+    },
+    "trash": {
+      "occupants_per_unit": {
+        "studio": 1.5,
+        "one_bedroom": 2.0,
+        "two_bedroom": 3.0,
+        "three_bedroom": 4.0
+      },
+      "volume_cy_per_person_per_week": 0.2,
+      "pickups_per_week": 2.0,
+      "room_max_distance_ft": 120.0,
+      "dumpster_length_ft": 6.0,
+      "dumpster_fill_factor": 0.8,
+      "dumpster_clearance_factor": 2.5,
+      "recycling_ratio": 0.3,
+      "recycling_room_enabled": true,
+      "compost_ratio": 0.25,
+      "compost_room_enabled": true,
+      "chute_room_area_sf": 30.0,
+      "chute_min_total_stories": 10,
+      "compactor_width_ft": 6.0,
+      "compactor_length_ft": 12.0,
+      "compactor_side_clear_ft": 6.0,
+      "compactor_front_clear_ft": 4.0,
+      "compaction_ratio": 5.0,
+      "recycling_area_formula": [
+        {
+          "max_units": 20,
+          "sf": 30.0
+        },
+        {
+          "max_units": 50,
+          "sf": 60.0
+        },
+        {
+          "max_units": null,
+          "sf": 100.0
+        }
+      ],
+      "trash_vestibule_with_chute_sf": 48.0,
+      "trash_vestibule_without_chute_sf": 63.0,
+      "trash_vestibule_story_enable_min": 2,
+      "trash_vestibule_qty_per_res_floor": 2.0,
+      "loading_dock_units_per_bay": 250.0,
+      "loading_dock_default_sf": 250.0,
+      "loading_zone_threshold_units": 250.0,
+      "loading_zone_default_sf": 400.0
+    },
+    "staff_and_management": {
+      "leasing_office_interp": {
+        "units_1": 100.0,
+        "qty_1": 1.0,
+        "units_2": 1000.0,
+        "qty_2": 2.0,
+        "room_w_ft": 10.0,
+        "room_d_ft": 10.0
+      },
+      "manager_office_interp": {
+        "affordable_only": true,
+        "units_1": 100.0,
+        "qty_1": 1.0,
+        "units_2": 1000.0,
+        "qty_2": 2.0,
+        "room_w_ft": 10.0,
+        "room_d_ft": 10.0
+      },
+      "parking_control_piecewise": [
+        {
+          "enable_min_stalls": 300
+        },
+        {
+          "max_stalls": 400,
+          "formula": "0.16*ps + 56"
+        },
+        {
+          "max_stalls": 1000,
+          "formula": "max(0.8*ps, 150)"
+        },
+        {
+          "max_stalls": null,
+          "formula": "0.6*ps + 80"
+        }
+      ],
+      "cctv_room_enabled": true,
+      "cctv_room_min_sf": 60.0,
+      "staff_break_room": {
+        "enabled": false,
+        "units_1": 100.0,
+        "qty_1": 0.0,
+        "units_2": 1000.0,
+        "qty_2": 1.0,
+        "area_sf": 144.0
+      },
+      "staff_locker_showers_enabled": true,
+      "staff_locker_showers_base_sf": 146.0,
+      "staff_locker_showers_circulation_ratio": 0.25,
+      "staff_restroom_enabled": true,
+      "staff_restroom_min_sf": 60.0,
+      "staff_restroom_circulation_ratio": 0.2,
+      "staff_restroom_fixture_area_sf": {
+        "group_1": 25.0,
+        "group_2": 11.0,
+        "group_3": 15.0
+      }
+    }
+  },
+  "amenity_defaults": {
+    "strategy_multiplier": {
+      "min_code": 1.0,
+      "balanced": 1.35,
+      "premium": 1.85,
+      "user_selected": 1.2
+    },
+    "indoor_min_sf_per_du": 12.0,
+    "outdoor_min_sf_per_du": 18.0,
+    "resident_restroom_min_sf": 60.0,
+    "resident_restroom_circulation_ratio": 0.2,
+    "resident_restroom_fixture_area_sf": {
+      "wc": 25.0,
+      "urinal": 11.0,
+      "lavatory": 15.0
+    },
+    "resident_restroom_enable_includes": [
+      "club_room"
+    ],
+    "resident_restroom_occupancy_defaults": [
+      {
+        "amenity": "club_room",
+        "type": "A-3",
+        "occupant_load_factor_sf_per_occ": 15.0
+      },
+      {
+        "amenity": "fitness",
+        "type": "A-3",
+        "occupant_load_factor_sf_per_occ": 50.0
+      },
+      {
+        "amenity": "cowork",
+        "type": "B",
+        "occupant_load_factor_sf_per_occ": 150.0
+      }
+    ],
+    "amenity_storage_ratio": 0.08,
+    "outdoor_amenity_circulation_ratio": 0.2,
+    "catalog": [
+      {
+        "name": "fitness",
+        "area_sf": 1800.0,
+        "indoor": true
+      },
+      {
+        "name": "cowork",
+        "area_sf": 1400.0,
+        "indoor": true
+      },
+      {
+        "name": "club_room",
+        "area_sf": 2200.0,
+        "indoor": true
+      },
+      {
+        "name": "package_lounge",
+        "area_sf": 600.0,
+        "indoor": true
+      },
+      {
+        "name": "pet_spa",
+        "area_sf": 350.0,
+        "indoor": true
+      },
+      {
+        "name": "roof_deck",
+        "area_sf": 4000.0,
+        "indoor": false
+      },
+      {
+        "name": "pool",
+        "area_sf": 5000.0,
+        "indoor": false
+      },
+      {
+        "name": "sky_lounge",
+        "area_sf": 2500.0,
+        "indoor": true
+      },
+      {
+        "name": "concierge",
+        "area_sf": 481.56662406666555,
+        "indoor": true
+      },
+      {
+        "name": "massage",
+        "area_sf": 230.03182458013103,
+        "indoor": true
+      },
+      {
+        "name": "spa",
+        "area_sf": 597.09069291284686,
+        "indoor": true
+      },
+      {
+        "name": "sauna",
+        "area_sf": 586.03345785890519,
+        "indoor": true
+      },
+      {
+        "name": "theater",
+        "area_sf": 439.52509339417901,
+        "indoor": true
+      }
+    ]
+  },
+  "preliminary_area_budget": {
+    "default_support_staff_profile": "affordable",
+    "support_staff_ratio_formula": {
+      "affordable": {
+        "slope_inv_stories": -0.0296562344750819,
+        "slope_inv_gfa": 2020.30988757719,
+        "slope_story_over_gfa": 21.4875531529969,
+        "intercept": 0.0463767794258712
+      },
+      "market": {
+        "slope_inv_stories": -0.0292965503799396,
+        "slope_inv_gfa": 1745.97020664942,
+        "slope_story_over_gfa": 22.2992695811091,
+        "intercept": 0.0429088168923499
+      }
+    },
+    "coarse_corridor_width_ft": {
+      "gfa_break_sf": 25000.0,
+      "below_break": 4.0,
+      "at_or_above_break": 5.0,
+      "loading_factor": 2.0
+    },
+    "fixed_common_area_sf": 70.0,
+    "stair_vestibule": {
+      "area_sf": 40.0,
+      "count_per_floor": 2.0,
+      "occupancy_term_normalizer_sf": 100.0
+    },
+    "elevator_lobby": {
+      "per_bank_low_mid_sf": 120.0,
+      "per_bank_high_sf": 150.0,
+      "split_factor": 0.5,
+      "term_normalizer_sf": 80.0
+    },
+    "open_space_term": {
+      "weight": 0.25,
+      "per_unit_sf": {
+        "studio": 100.0,
+        "one_bedroom": 100.0,
+        "two_bedroom": 125.0,
+        "three_bedroom": 175.0
+      }
+    },
+    "circulation_regression": {
+      "small_gba_threshold_sf": 27250.0,
+      "large_gba_threshold_sf": 2618550.0,
+      "small_ratio": 0.1831,
+      "large_ratio": 0.0801,
+      "small_quadratic": {
+        "a": -3.23685901158893e-08,
+        "b": 0.0912391736085469,
+        "c": 2528.21139403587,
+        "y_min": 3783.0,
+        "y_max": 59223.0
+      },
+      "large_quadratic": {
+        "a": 1.60103331795005e-08,
+        "b": 0.0347439254150707,
+        "c": 8982.97329958147,
+        "y_min": 48009.25,
+        "y_max": 209787.0
+      }
+    }
+  },
+  "parking": {
+    "default_stalls_per_unit": {
+      "studio": 1.0,
+      "one_bedroom": 1.25,
+      "two_bedroom": 1.5,
+      "three_bedroom": 2.0
+    },
+    "retail_sf_per_stall": 300.0,
+    "surface": {
+      "stall_width_ft": 9.0,
+      "stall_depth_ft": 18.0,
+      "aisle_width_ft": 24.0,
+      "gross_sf_per_stall": 325.0,
+      "angle_profiles": {
+        "ninety_deg": {
+          "angle_deg": 90,
+          "aisle_width_ft": 24.0,
+          "stall_projection_formula": "stall_depth_ft * sin(theta)",
+          "longitudinal_spacing_formula": "stall_width_ft / sin(theta)",
+          "remaining_spacing_formula": "stall_depth_ft * cos(theta)"
+        },
+        "sixty_deg": {
+          "angle_deg": 60,
+          "aisle_width_ft": 25.8333333333,
+          "stall_projection_formula": "stall_depth_ft * sin(theta)",
+          "longitudinal_spacing_formula": "stall_width_ft / sin(theta)",
+          "remaining_spacing_formula": "stall_depth_ft * cos(theta)"
+        },
+        "forty_five_deg": {
+          "angle_deg": 45,
+          "aisle_width_ft": 29.6666666667,
+          "stall_projection_formula": "stall_depth_ft * sin(theta)",
+          "longitudinal_spacing_formula": "stall_width_ft / sin(theta)",
+          "remaining_spacing_formula": "stall_depth_ft * cos(theta)"
+        }
+      }
+    },
+    "gross_sf_per_stall": {
+      "surface": 325.0,
+      "podium": 360.0,
+      "structured": 340.0,
+      "underground": 380.0,
+      "mixed": 355.0
+    }
+  },
+  "boh_spaces": {
+    "low_voltage": {
+      "mpoe_interp": {
+        "units_1": 100.0,
+        "qty_1": 1.0,
+        "units_2": 1000.0,
+        "qty_2": 4.0,
+        "room_w_ft": 10.0,
+        "room_d_ft": 10.0
+      },
+      "idf_interp": {
+        "units_1": 100.0,
+        "qty_1": 8.0,
+        "units_2": 1000.0,
+        "qty_2": 20.0,
+        "room_w_ft": 4.0,
+        "room_d_ft": 6.0,
+        "room_max_sf": 150.0,
+        "enable_min_stories": 3
+      },
+      "das_area_formula": "0.4758462914*du + 50.3745710039"
+    },
+    "electrical": {
+      "main_electrical_piecewise": [
+        {
+          "max_kva": 432.0,
+          "sf": 160.0
+        },
+        {
+          "max_kva": 720.0,
+          "sf": 210.0
+        },
+        {
+          "max_kva": 1440.0,
+          "sf": 320.0
+        },
+        {
+          "max_kva": 3324.0,
+          "sf": 450.0
+        },
+        {
+          "max_kva": 6648.0,
+          "sf": 800.0
+        },
+        {
+          "max_kva": null,
+          "sf": 1600.0
+        }
+      ],
+      "gas_utility_room": {
+        "enabled": true,
+        "master_meter_count": 1,
+        "single_meter_length_ft": 5.0,
+        "per_meter_length_ft": 2.0,
+        "length_offset_ft": 2.0,
+        "width_ft": 5.0,
+        "dcu_closet_sf": 36.0
+      },
+      "gas_meter_space_alcove": {
+        "enabled": false,
+        "bank_depth_ft": 3.0,
+        "front_clear_ft": 3.0,
+        "single_bank_width_ft": 1.166666666666667,
+        "two_meter_bank_width_ft": 2.8333333333333335,
+        "additional_meter_width_ft": 1.3333333333333333,
+        "side_clear_ft": 1.0
+      },
+      "coarse_total_load": {
+        "main_room_enable_min_units": 16,
+        "elevator_kva_per_car": 20.0,
+        "motor_constant_kva": 63.037,
+        "corridor_w_per_sf": 5.5,
+        "retail_w_per_sf": 22.5,
+        "shaft_stair_w_per_sf": 6.5,
+        "entry_lobby_w_per_sf": 22.5,
+        "indoor_parking_w_per_sf": 1.25,
+        "residential_lighting_w_per_sf": 3.0,
+        "dwelling_unit_appliance_connected_kva_per_du": 20.45,
+        "dwelling_unit_misc_connected_kva_per_du": 2.267,
+        "stair_shaft_area_sf_per_stair_per_floor": 84.5079365079365
+      },
+      "customer_station_indoor": {
+        "enabled": true,
+        "transformer_base_length_ft": 6.0,
+        "transformer_length_scale_ft": 4.0,
+        "transformer_base_width_ft": 4.0,
+        "transformer_width_scale_ft": 2.0,
+        "transformer_reference_kva": 1000.0,
+        "transformer_front_clear_ft": 3.0,
+        "transformer_rear_clear_ft": 3.0,
+        "transformer_side_clear_ft": 3.0,
+        "transformer_wall_buffer_ft": 1.0,
+        "gear_envelope_length_ft": 14.0,
+        "gear_envelope_width_ft": 8.0,
+        "service_aisle_ft": 3.0,
+        "circulation_ratio": 0.1,
+        "ancillary_fixed_per_floor_sf": 0.0,
+        "transformer_vault_floors": 2,
+        "formula": "IF(enabled, MIN((tx_envelope_sf + gear_envelope_sf + service_aisle_ft*MAX(tx_envelope_length_ft,gear_envelope_length_ft))*(1+circulation_ratio)+ancillary_fixed_per_floor_sf, ((tx_envelope_length_ft + gear_envelope_length_ft + service_aisle_ft)*MAX(tx_envelope_width_ft,gear_envelope_width_ft))*(1+circulation_ratio)+ancillary_fixed_per_floor_sf) * transformer_vault_floors, 0)"
+      },
+      "utility_infrastructure_exterior": {
+        "load_growth_ratio": 0.1,
+        "layout_growth_ratio": 0.15,
+        "other_area_sf": 10.0,
+        "transformer_options": [
+          {
+            "rating_kva": 45.0,
+            "selection_cost_usd": 14700.0
+          },
+          {
+            "rating_kva": 75.0,
+            "selection_cost_usd": 16600.0
+          },
+          {
+            "rating_kva": 112.5,
+            "selection_cost_usd": 18400.0
+          },
+          {
+            "rating_kva": 150.0,
+            "selection_cost_usd": 20000.0
+          },
+          {
+            "rating_kva": 225.0,
+            "selection_cost_usd": 22600.0
+          },
+          {
+            "rating_kva": 300.0,
+            "selection_cost_usd": 24800.0
+          },
+          {
+            "rating_kva": 500.0,
+            "selection_cost_usd": 29700.0
+          },
+          {
+            "rating_kva": 750.0,
+            "selection_cost_usd": 34500.0
+          },
+          {
+            "rating_kva": 1000.0,
+            "selection_cost_usd": 38500.0
+          },
+          {
+            "rating_kva": 1500.0,
+            "selection_cost_usd": 45300.0
+          },
+          {
+            "rating_kva": 2000.0,
+            "selection_cost_usd": 51000.0
+          },
+          {
+            "rating_kva": 2500.0,
+            "selection_cost_usd": 56100.0
+          },
+          {
+            "rating_kva": 3000.0,
+            "selection_cost_usd": 60600.0
+          },
+          {
+            "rating_kva": 3750.0,
+            "selection_cost_usd": 66800.0
+          },
+          {
+            "rating_kva": 5000.0,
+            "selection_cost_usd": 75900.0
+          },
+          {
+            "rating_kva": 7500.0,
+            "selection_cost_usd": 91100.0
+          }
+        ],
+        "dry_area_guide": [
+          {
+            "max_kva": 30.0,
+            "area_sf": 26.98566361111111
+          },
+          {
+            "max_kva": 45.0,
+            "area_sf": 26.98566361111111
+          },
+          {
+            "max_kva": 75.0,
+            "area_sf": 31.337499999999995
+          },
+          {
+            "max_kva": 112.5,
+            "area_sf": 37.141406249999996
+          },
+          {
+            "max_kva": 150.0,
+            "area_sf": 37.141406249999996
+          },
+          {
+            "max_kva": 225.0,
+            "area_sf": 40.45284722222222
+          },
+          {
+            "max_kva": 300.0,
+            "area_sf": 43.074447916666664
+          }
+        ],
+        "pad_area_guide": [
+          {
+            "max_kva": 45.0,
+            "area_sf": 115.76666666666667
+          },
+          {
+            "max_kva": 75.0,
+            "area_sf": 115.76666666666667
+          },
+          {
+            "max_kva": 112.5,
+            "area_sf": 123.43333333333334
+          },
+          {
+            "max_kva": 150.0,
+            "area_sf": 123.43333333333334
+          },
+          {
+            "max_kva": 225.0,
+            "area_sf": 130.17361111111106
+          },
+          {
+            "max_kva": 300.0,
+            "area_sf": 130.17361111111106
+          },
+          {
+            "max_kva": 500.0,
+            "area_sf": 154.171875
+          },
+          {
+            "max_kva": 750.0,
+            "area_sf": 157.90937499999998
+          },
+          {
+            "max_kva": 1000.0,
+            "area_sf": 159.778125
+          },
+          {
+            "max_kva": 1500.0,
+            "area_sf": 185.00625
+          },
+          {
+            "max_kva": 2000.0,
+            "area_sf": 158.9236111111111
+          },
+          {
+            "max_kva": 2500.0,
+            "area_sf": 168.50694444444443
+          },
+          {
+            "max_kva": 3000.0,
+            "area_sf": 188.72777777777776
+          },
+          {
+            "max_kva": 3750.0,
+            "area_sf": 196.77777777777777
+          },
+          {
+            "max_kva": 5000.0,
+            "area_sf": 217.86111111111114
+          },
+          {
+            "max_kva": 7500.0,
+            "area_sf": 231.725
+          }
+        ],
+        "formula": "required_kva = demand_kva*1.25*(1+load_growth_ratio); qty/rating = argmin(CEILING(required_kva/rating_kva,1)*selection_cost_usd); area = IF(NOT(customer_station_indoor_enabled) OR required_kva<=249, XLOOKUP(selected_rating, guide_by_type)*qty*(1+layout_growth_ratio) + other_area_sf, 0)"
+      },
+      "generator_room": {
+        "enable_min_stories": 9,
+        "site_factor": 0.95,
+        "growth_ratio": 0.15,
+        "fire_alarm_kva": 3.0,
+        "smoke_control_kw": 40.0,
+        "smoke_control_power_factor": 0.9,
+        "smoke_control_demand_factor": 1.0,
+        "domestic_booster_kw": 15.0,
+        "domestic_booster_power_factor": 0.8,
+        "domestic_booster_demand_factor": 0.5,
+        "fire_pump_start_kva": 282.0,
+        "emergency_start_kva": 170.0,
+        "mandatory_start_kva": 270.0,
+        "optional_start_kva": 114.0,
+        "options": [
+          {
+            "standby_rating_kva": 75.0,
+            "cost_usd": 32700.0,
+            "added_clearance_footprint_sf": 128.3
+          },
+          {
+            "standby_rating_kva": 125.0,
+            "cost_usd": 37900.0,
+            "added_clearance_footprint_sf": 141.6
+          },
+          {
+            "standby_rating_kva": 188.0,
+            "cost_usd": 44700.0,
+            "added_clearance_footprint_sf": 160.5
+          },
+          {
+            "standby_rating_kva": 250.0,
+            "cost_usd": 51700.0,
+            "added_clearance_footprint_sf": 175.0
+          },
+          {
+            "standby_rating_kva": 313.0,
+            "cost_usd": 59000.0,
+            "added_clearance_footprint_sf": 174.2
+          },
+          {
+            "standby_rating_kva": 375.0,
+            "cost_usd": 66500.0,
+            "added_clearance_footprint_sf": 187.8
+          },
+          {
+            "standby_rating_kva": 625.0,
+            "cost_usd": 99400.0,
+            "added_clearance_footprint_sf": 224.8
+          },
+          {
+            "standby_rating_kva": 1000.0,
+            "cost_usd": 156700.0,
+            "added_clearance_footprint_sf": 268.080694444444
+          },
+          {
+            "standby_rating_kva": 1250.0,
+            "cost_usd": 200300.0,
+            "added_clearance_footprint_sf": 283.5
+          },
+          {
+            "standby_rating_kva": 1563.0,
+            "cost_usd": 260900.0,
+            "added_clearance_footprint_sf": 329.7
+          },
+          {
+            "standby_rating_kva": 1875.0,
+            "cost_usd": 328000.0,
+            "added_clearance_footprint_sf": 376.6
+          },
+          {
+            "standby_rating_kva": 2500.0,
+            "cost_usd": 482500.0,
+            "added_clearance_footprint_sf": 376.6
+          }
+        ]
+      },
+      "ats_room": {
+        "input_voltage_v": 208.0,
+        "generator_output_voltage_v": 480.0,
+        "ev_qty": 0,
+        "critical_qty": 0,
+        "front_clear_ft": 3.0,
+        "two_side_clear_ft": 2.0,
+        "two_equipment_clear_ft": 1.0,
+        "growth_ratio": 0.25,
+        "step_down_small_max_kva": 500.0,
+        "step_down_small_width_in": 54.0,
+        "step_down_small_depth_in": 42.0,
+        "step_down_large_width_in": 72.0,
+        "step_down_large_depth_in": 60.0,
+        "generator_distribution_width_in": 6.0,
+        "generator_distribution_depth_in": 24.0,
+        "service_entrance_breaker_width_in": 8.0,
+        "service_entrance_breaker_depth_in": 8.0,
+        "equipment_sizing": [
+          {
+            "max_amps": 200.0,
+            "width_in": 17.5,
+            "depth_in": 35.0
+          },
+          {
+            "max_amps": 230.0,
+            "width_in": 18.0,
+            "depth_in": 14.3
+          },
+          {
+            "max_amps": 400.0,
+            "width_in": 24.0,
+            "depth_in": 18.2
+          },
+          {
+            "max_amps": 600.0,
+            "width_in": 24.0,
+            "depth_in": 18.2
+          },
+          {
+            "max_amps": 1000.0,
+            "width_in": 34.0,
+            "depth_in": 20.0
+          },
+          {
+            "max_amps": 1200.0,
+            "width_in": 41.0,
+            "depth_in": 33.5
+          },
+          {
+            "max_amps": 1600.0,
+            "width_in": 42.5,
+            "depth_in": 47.0
+          },
+          {
+            "max_amps": 2000.0,
+            "width_in": 42.5,
+            "depth_in": 47.0
+          },
+          {
+            "max_amps": 3000.0,
+            "width_in": 41.0,
+            "depth_in": 74.0
+          }
+        ]
+      },
+      "emergency_lighting_inverter_room": {
+        "enable_min_units": 50,
+        "lighting_power_factor": 0.92,
+        "room_guide": [
+          {
+            "load_kw": 5.0,
+            "width_ft": 7.0,
+            "depth_ft": 6.0
+          },
+          {
+            "load_kw": 15.0,
+            "width_ft": 9.0,
+            "depth_ft": 6.0
+          },
+          {
+            "load_kw": 30.0,
+            "width_ft": 10.0,
+            "depth_ft": 7.0
+          },
+          {
+            "load_kw": 50.0,
+            "width_ft": 14.0,
+            "depth_ft": 6.0
+          },
+          {
+            "load_kw": 100.0,
+            "width_ft": 15.0,
+            "depth_ft": 10.0
+          }
+        ]
+      },
+      "solar_battery_ups_room": {
+        "enable_min_units": 50,
+        "low_rise_max_stories": 3,
+        "low_rise_min_available_roof_ratio": 0.15,
+        "backup_time_hr": 0.8,
+        "capacity_factor": 2.0,
+        "battery_cabinet_kwh": 34.0,
+        "battery_dod": 0.8,
+        "battery_age_factor": 1.15,
+        "power_cabinet_kwh": 250.0,
+        "power_cabinet_qty_offset": 1,
+        "pcs_kwh": 125.0,
+        "distribution_cabinet_kwh": 250.0,
+        "battery_width_in": 25.6,
+        "battery_depth_in": 23.1,
+        "power_width_in": 23.6,
+        "power_depth_in": 37.5,
+        "pcs_width_in": 23.6,
+        "pcs_depth_in": 31.5,
+        "distribution_width_in": 36.0,
+        "distribution_depth_in": 32.0,
+        "front_clear_ft": 3.0,
+        "two_side_clear_ft": 2.0,
+        "between_equipment_clear_ft": 1.0,
+        "hvac_egress_ratio": 0.2
+      },
+      "fan_room_ahu_room": {
+        "enable_min_supply_air_cfm": 5000.0,
+        "use_cono_sensor_control": false,
+        "residential_air_cfm_per_sf": 0.03,
+        "residential_air_cfm_per_bedroom": 7.5,
+        "residential_bedroom_offset": 1.0,
+        "non_residential_air_cfm_per_sf": 0.1,
+        "parking_air_cfm_per_sf_full_on": 0.0,
+        "parking_air_cfm_per_sf_sensor_control": 0.0,
+        "width_base_ft": 7.0,
+        "width_per_10k_cfm_ft": 0.5,
+        "equipment_depth_base_ft": 3.0,
+        "equipment_depth_per_sqrt_1k_cfm_ft": 0.35,
+        "front_clear_ft": 4.0,
+        "side_clear_ft": 2.0
+      },
+      "mechanical_pad_outdoor": {
+        "enabled": false,
+        "split_max_units": 100,
+        "split_roof_sf_per_unit": 30.0,
+        "split_max_roof_coverage_ratio": 0.3,
+        "split_width_ft": 2.5,
+        "split_depth_ft": 2.25,
+        "vrf_tons": 14.0,
+        "vrf_width_ft": 4.083333333333333,
+        "vrf_depth_ft": 2.5,
+        "residential_sf_per_ton": 500.0,
+        "layout_divisor": 4.0,
+        "service_aisle_ft": 3.0,
+        "equipment_clear_ft": 2.0,
+        "front_clear_ft": 4.0,
+        "side_clear_ft": 3.0
+      },
+      "commercial_kitchen_shaft": {
+        "range_qty_units_1": 100.0,
+        "range_qty_1": 1.0,
+        "range_qty_units_2": 1000.0,
+        "range_qty_2": 4.0,
+        "range_width_ft": 3.0,
+        "hood_length_offset_ft": 1.0,
+        "use_hood_ul710": true,
+        "range_type_electric": true,
+        "ul710_exhaust_rate_cfm_per_ft": 250.0,
+        "electric_exhaust_rate_cfm_per_ft": 300.0,
+        "gas_exhaust_rate_cfm_per_ft": 400.0,
+        "diversity_factor": 0.8,
+        "future_expansion_ratio": 0.1,
+        "exhaust_velocity_fpm": 1500.0,
+        "round_duct_upsize_in": 2.0,
+        "clearance_in": 6.0,
+        "waste_vent_width_in": 4.0,
+        "other_system_area_sf": 0.25
+      },
+      "ventilation_ref_riser_space": {
+        "enable_min_supply_air_cfm": 5000.0,
+        "small_units_max": 100,
+        "small_density_sf_per_du": 30.0,
+        "small_density_max_ratio": 0.3,
+        "small_module_tons": 2.0,
+        "small_module_qty_divisor": 6.0,
+        "small_module_area_sf": 0.60546875,
+        "large_module_coverage_sf": 7000.0,
+        "large_module_area_sf": 0.24088541666666663,
+        "residential_air_cfm_per_sf": 0.03,
+        "residential_air_cfm_per_bedroom": 7.5,
+        "residential_bedroom_offset": 1.0,
+        "duct_velocity_fpm": 1400.0,
+        "pipe_diameter_in": 1.0,
+        "clearance_in": 2.0,
+        "bathroom_exhaust_cfm": 50.0,
+        "unit_kitchen_exhaust_cfm": 100.0,
+        "bathrooms_per_studio": 1,
+        "bathrooms_per_one_bedroom": 1,
+        "bathrooms_per_two_bedroom": 2,
+        "bathrooms_per_three_bedroom": 2
+      },
+      "domestic_water_booster_room": {
+        "enable_min_stories": 4,
+        "story_height_ft": 10.5,
+        "future_growth_ratio": 0.1,
+        "continuous_demand_gpm": 10.0,
+        "residential_wsfu_per_studio": 11.0,
+        "residential_wsfu_per_one_bedroom": 11.0,
+        "residential_wsfu_per_two_bedroom": 17.66,
+        "residential_wsfu_per_three_bedroom": 18.25,
+        "public_wc_wsfu": 5.0,
+        "public_urinal_wsfu": 3.0,
+        "public_lav_wsfu": 1.5,
+        "public_kitchen_sink_qty": 2,
+        "public_kitchen_sink_wsfu": 3.0,
+        "public_service_sink_qty": 1,
+        "public_service_sink_wsfu": 1.5,
+        "peak_flow_cubic_a": 7.14989940834419e-10,
+        "peak_flow_cubic_b": -0.000018476638375418,
+        "peak_flow_cubic_c": 0.188701795436697,
+        "peak_flow_cubic_d": 19.9557146947566,
+        "pipe_velocity_fps": 8.0,
+        "pipe_capacity_constant": 2.45,
+        "hazen_williams_c": 140.0,
+        "fitting_friction_loss_factor": 0.15,
+        "friction_loss_max_psi_per_100ft": 5.0,
+        "residual_pressure_psi": 20.0,
+        "meter_backflow_prv_valves_psi": 20.0,
+        "safety_margin_psi": 5.0,
+        "lowest_city_pressure_psi": 40.0,
+        "run_fraction": 0.3,
+        "high_story_three_pump_min_stories": 12,
+        "duty_pump_low_flow_max_gpm": 150.0,
+        "duty_pump_mid_flow_max_gpm": 450.0,
+        "low_story_max_for_longer_run": 9,
+        "min_run_time_low_story_min": 0.5,
+        "min_run_time_high_story_min": 0.25,
+        "expansion_tank_delta_p_psi": 15.0,
+        "expansion_tank_capacity_gal": 60.0,
+        "expansion_tank_diameter_curve_a": 6.6,
+        "expansion_tank_diameter_curve_b": 0.3,
+        "expansion_tank_diameter_curve_c": 2.0,
+        "standby_pump_qty": 1,
+        "pump_width_in": 60.0,
+        "pump_depth_in": 54.0,
+        "control_panel_qty": 1,
+        "control_panel_width_in": 30.0,
+        "control_panel_depth_in": 12.0,
+        "front_clear_ft": 3.0,
+        "side_clear_ft": 0.0,
+        "equipment_clear_ft": 2.0
+      },
+      "cistern_water_storage_room": {
+        "enabled": true,
+        "a": 3.1287952735256601,
+        "b": 168.27348005292785
+      },
+      "backflow_preventer_room": {
+        "enabled": true,
+        "max_pipe_diameter_in": 10.0,
+        "pipe_velocity_fps": 8.0,
+        "pipe_capacity_constant": 2.45,
+        "domestic_backflow_guide": [
+          {
+            "max_diameter_in": 1.0,
+            "width_in": 12.0,
+            "depth_in": 48.0
+          },
+          {
+            "max_diameter_in": 2.0,
+            "width_in": 21.0,
+            "depth_in": 48.0
+          },
+          {
+            "max_diameter_in": 2.5,
+            "width_in": 40.0,
+            "depth_in": 48.0
+          },
+          {
+            "max_diameter_in": 3.0,
+            "width_in": 50.0,
+            "depth_in": 48.0
+          },
+          {
+            "max_diameter_in": 4.0,
+            "width_in": 59.0,
+            "depth_in": 48.0
+          },
+          {
+            "max_diameter_in": 6.0,
+            "width_in": 69.0,
+            "depth_in": 48.0
+          },
+          {
+            "max_diameter_in": 8.0,
+            "width_in": 74.0,
+            "depth_in": 48.0
+          },
+          {
+            "max_diameter_in": 10.0,
+            "width_in": 86.0,
+            "depth_in": 48.0
+          }
+        ],
+        "fire_backflow_guide": [
+          {
+            "max_diameter_in": 3.0,
+            "width_in": 48.0,
+            "depth_in": 30.0
+          },
+          {
+            "max_diameter_in": 4.0,
+            "width_in": 61.0,
+            "depth_in": 36.0
+          },
+          {
+            "max_diameter_in": 6.0,
+            "width_in": 74.0,
+            "depth_in": 42.0
+          },
+          {
+            "max_diameter_in": 8.0,
+            "width_in": 86.0,
+            "depth_in": 42.0
+          },
+          {
+            "max_diameter_in": 10.0,
+            "width_in": 90.0,
+            "depth_in": 48.0
+          }
+        ],
+        "fire_backflow_qty": 1,
+        "irrigation_qty": 1,
+        "irrigation_width_in": 17.375,
+        "irrigation_depth_in": 5.125,
+        "front_clear_ft": 3.0,
+        "side_clear_ft": 0.0,
+        "equipment_clear_ft": 2.0
+      },
+      "central_water_heating_room_indoor": {
+        "enabled": true,
+        "sum_width_ft": 16.197916666666668,
+        "sum_depth_ft": 4.21875,
+        "a": 3.2319785547045101,
+        "b": 7.2912227109380279,
+        "c": 1.9516446960384997
+      },
+      "central_water_heating_pad_outdoor": {
+        "enabled": false,
+        "sum_width_ft": 16.197916666666668,
+        "sum_depth_ft": 4.21875,
+        "a": 3.2319785547045101,
+        "b": 7.2912227109380279,
+        "c": 1.9516446960384997
+      },
+      "graywater_system_room": {
+        "enabled": true,
+        "sum_width_ft": 14.75,
+        "sum_depth_ft": 3.791666666666667,
+        "a": -17.264919346786662,
+        "b": 84.090034759391955,
+        "c": 4.7230573603465018
+      },
+      "water_filtration_room": {
+        "enabled": true,
+        "building_occupants_per_studio": 2.0,
+        "building_occupants_per_one_bedroom": 2.0,
+        "building_occupants_per_two_bedroom": 4.0,
+        "building_occupants_per_three_bedroom": 6.0,
+        "a": 0.10790015829698081,
+        "b": 6.7175986302974771
+      },
+      "grease_interceptor_room": {
+        "enabled": true,
+        "tank_size_gal": 1500.0,
+        "a": 0.034658824307692299,
+        "b": 54.327346615384598
+      },
+      "rainwater_harvesting_room": {
+        "enabled": true,
+        "sum_width_ft": 17.0,
+        "sum_depth_ft": 12.0,
+        "a": 2.7837321432454201,
+        "b": 6.3827406449087878,
+        "c": -16.794361940379702
+      },
+      "plumbing_riser_shaft": {
+        "enabled": true,
+        "units_a": 0.40327223488749814,
+        "above_grade_stories_b": 2.3074042039169735,
+        "c": -1.0502021502156955
+      },
+      "water_prv_closet": {
+        "enabled": true,
+        "enable_min_above_grade_stories": 7,
+        "story_a": 0.18438518503609286,
+        "b": 0.92764877430930426
+      },
+      "fire_pump_room": {
+        "enable_min_total_stories": 4,
+        "design_fire_flow_gpm": 1000.0,
+        "jockey_controller_width_ft": 3.0,
+        "jockey_controller_depth_ft": 3.0,
+        "diesel_fuel_tank_enabled": true,
+        "diesel_fuel_tank_plan_factor": 0.035,
+        "pump_length_ft": 4.8,
+        "pump_width_ft": 3.3,
+        "front_clear_ft": 3.0,
+        "side_back_clear_ft": 1.0,
+        "min_sf": 100.0,
+        "max_sf": 400.0
+      },
+      "fire_control_room": {
+        "equipment_rack_count": 0
+      },
+      "sprinkler_riser_closets": {
+        "enable_max_total_stories_exclusive": 3,
+        "default_sf": 20.0
+      },
+      "sub_electrical_room": {
+        "enable_min_units": 60,
+        "enable_min_gba_sf": 50000.0,
+        "units_per_panelboard": 12.0,
+        "panel_depth_ft": 1.0,
+        "front_clear_ft": 3.0,
+        "wiggle_ft": 0.5,
+        "panel_width_ft": 2.5,
+        "side_clear_ft": 2.0,
+        "growth_ratio": 0.2,
+        "option_1_max_units_per_floor": 60.0,
+        "option_2_max_units_per_floor": 120.0,
+        "option_2_width_ft": 10.0,
+        "option_2_depth_ft": 10.0,
+        "option_3_width_ft": 10.0,
+        "option_3_depth_ft": 15.0
+      }
+    },
+    "vertical_transport": {
+      "shaft_story_gate_formula": "passenger_shaft = IF(total_stories>1, calculated_passenger_qty, 0); freight_shaft = IF(total_stories>1, calculated_freight_qty, 0); stair_shaft = IF(total_stories>1, calculated_stair_qty, 0)",
+      "wheelchair_lift_formula": "IF(enabled AND total_stories<=1, ROUND(LERP(dwelling_units,100->1,1000->2),0) * MAX(landing_ewa_sf, landing_code_min_sf) * stop_count, 0)",
+      "elevator_machine_room_formula": "passenger_room = XLOOKUP(rated_load_lb_default, guide_by_type, room_sf); freight_room = IF(has_freight_elevator, freight_width_ft*freight_depth_ft, 0); total = IF(has_passenger_elevator OR has_freight_elevator, (passenger_room + freight_room) * IF(on_roof_default, 1, 2), 0)",
+      "elevator_machine_room_split_formula": "interior = IF(has_machine_room AND NOT(on_roof_default), total, 0); roof = IF(has_machine_room AND on_roof_default, total, 0)"
+    },
+    "plumbing": {
+      "prv_closet_default_sf": 20.0,
+      "water_filtration_formula": "IF(enabled, building_occupants*a + b, 0)",
+      "coarse_building_occupants_formula": "studio*occ_studio + one_bed*occ_one_bed + two_bed*occ_two_bed + three_bed*occ_three_bed + CEILING(dwelling_units/operations_staff_per_units,1)",
+      "grease_interceptor_formula": "IF(enabled, tank_size_gal*a + b, 0)",
+      "rainwater_formula": "IF(enabled, sum_width_ft*a + sum_depth_ft*b + c, 0)",
+      "plumbing_riser_formula": "IF(enabled, dwelling_units*a + above_grade_stories*b + c, 0)",
+      "water_prv_closet_formula": "IF(enabled AND above_grade_stories>=min_stories, above_grade_stories*a + b, 0)",
+      "fire_pump_room_formula": "IF(total_stories>=min_stories, MAX(min_sf, MIN(max_sf, (pump_length_ft+front_clear_ft+side_back_clear_ft)*(pump_width_ft+2*side_back_clear_ft))) + jockey_width_ft*jockey_depth_ft + IF(diesel_fuel_tank_enabled, design_fire_flow_gpm*diesel_fuel_tank_plan_factor, 0), 0)",
+      "fire_control_formula": "IF(fire_pump_room_area_sf>0, MAX(0.00015*building_gross_sf, min_sf) + 20*equipment_rack_count, 0)",
+      "sprinkler_riser_closets_formula": "IF(total_stories<enable_max_total_stories_exclusive, default_sf, 0)",
+      "central_water_heating_pad_outdoor_formula": "IF(enabled AND NOT(central_water_heating_room_indoor_enabled), sum_width_ft*a + sum_depth_ft*b + c, 0)",
+      "gas_meter_space_alcove_formula": "IF(enabled AND NOT(gas_utility_room_enabled), (bank_depth_ft + front_clear_ft) * (IF(gas_meter_count<=1, single_bank_width_ft, IF(gas_meter_count=2, two_meter_bank_width_ft, two_meter_bank_width_ft + (gas_meter_count-2)*additional_meter_width_ft)) + side_clear_ft), 0)",
+      "fire_control_min_sf": 200.0,
+      "sprinkler_riser_default_sf": 20.0
+    }
+  },
+  "space_catalog_defaults": [
+    {
+      "category": "Dwelling Units",
+      "space_name": "Studio + 1 Bath (Typical)",
+      "gba_included": true,
+      "gfa_included": true,
+      "use_scaling_factor": true,
+      "finish_type": "FF01+FF02",
+      "ceiling_type": "CL2",
+      "slab_thickness_in": 7
+    },
+    {
+      "category": "Dwelling Units",
+      "space_name": "1 Bedroom + 1 Bath (Typical)",
+      "gba_included": true,
+      "gfa_included": true,
+      "use_scaling_factor": true,
+      "finish_type": "FF01+FF02",
+      "ceiling_type": "CL2",
+      "slab_thickness_in": 7
+    },
+    {
+      "category": "Dwelling Units",
+      "space_name": "2 Bedroom + 2 Bath (Typical)",
+      "gba_included": true,
+      "gfa_included": true,
+      "use_scaling_factor": true,
+      "finish_type": "FF01+FF02",
+      "ceiling_type": "CL2",
+      "slab_thickness_in": 7
+    },
+    {
+      "category": "Dwelling Units",
+      "space_name": "2 Bedroom + 1 Bath",
+      "gba_included": true,
+      "gfa_included": true,
+      "use_scaling_factor": true,
+      "finish_type": "FF01+FF02",
+      "ceiling_type": "CL2",
+      "slab_thickness_in": 7
+    },
+    {
+      "category": "Dwelling Units",
+      "space_name": "2 Bedroom + 2 Bath + Powder",
+      "gba_included": true,
+      "gfa_included": true,
+      "use_scaling_factor": true,
+      "finish_type": "FF01+FF02",
+      "ceiling_type": "CL2",
+      "slab_thickness_in": 7
+    },
+    {
+      "category": "Dwelling Units",
+      "space_name": "3 Bedroom + 2 Bath",
+      "gba_included": true,
+      "gfa_included": true,
+      "use_scaling_factor": true,
+      "finish_type": "FF01+FF02",
+      "ceiling_type": "CL2",
+      "slab_thickness_in": 7
+    },
+    {
+      "category": "Dwelling Units",
+      "space_name": "3 Bedroom + 2 Bath + Powder",
+      "gba_included": true,
+      "gfa_included": true,
+      "use_scaling_factor": true,
+      "finish_type": "FF01+FF02",
+      "ceiling_type": "CL2",
+      "slab_thickness_in": 7
+    },
+    {
+      "category": "Retail",
+      "space_name": "Retail",
+      "gba_included": true,
+      "gfa_included": true,
+      "use_scaling_factor": false,
+      "finish_type": "FF07",
+      "ceiling_type": "CL0",
+      "slab_thickness_in": 9
+    },
+    {
+      "category": "Circulation",
+      "space_name": "Corridor - Residential",
+      "gba_included": true,
+      "gfa_included": true,
+      "use_scaling_factor": true,
+      "finish_type": "FF03",
+      "ceiling_type": "CL2",
+      "slab_thickness_in": 8
+    },
+    {
+      "category": "Circulation",
+      "space_name": "Vestibule - Elevator Lobby",
+      "gba_included": true,
+      "gfa_included": true,
+      "use_scaling_factor": true,
+      "finish_type": "FF04",
+      "ceiling_type": "CL3",
+      "slab_thickness_in": 8
+    },
+    {
+      "category": "Circulation",
+      "space_name": "Vestibule - Stair ",
+      "gba_included": true,
+      "gfa_included": true,
+      "use_scaling_factor": true,
+      "finish_type": "FF05",
+      "ceiling_type": "CL0",
+      "slab_thickness_in": 8
+    },
+    {
+      "category": "Circulation",
+      "space_name": "Vestibule - Entry Wind Lobby",
+      "gba_included": true,
+      "gfa_included": true,
+      "use_scaling_factor": true,
+      "finish_type": "FF04",
+      "ceiling_type": "CL3",
+      "slab_thickness_in": 8
+    },
+    {
+      "category": "Circulation",
+      "space_name": "Shaft - Elevator - Passenger",
+      "gba_included": false,
+      "gfa_included": false,
+      "use_scaling_factor": false,
+      "finish_type": null,
+      "ceiling_type": null,
+      "slab_thickness_in": null
+    },
+    {
+      "category": "Circulation",
+      "space_name": "Shaft - Elevator - Freight",
+      "gba_included": false,
+      "gfa_included": false,
+      "use_scaling_factor": false,
+      "finish_type": null,
+      "ceiling_type": null,
+      "slab_thickness_in": null
+    },
+    {
+      "category": "Circulation",
+      "space_name": "Shaft - Stair",
+      "gba_included": true,
+      "gfa_included": false,
+      "use_scaling_factor": false,
+      "finish_type": null,
+      "ceiling_type": null,
+      "slab_thickness_in": null
+    },
+    {
+      "category": "Circulation",
+      "space_name": "Wheelchair Lift",
+      "gba_included": false,
+      "gfa_included": false,
+      "use_scaling_factor": false,
+      "finish_type": "FF04",
+      "ceiling_type": "CL3",
+      "slab_thickness_in": 8
+    },
+    {
+      "category": "Support Areas",
+      "space_name": "Bicycle Repair Area",
+      "gba_included": true,
+      "gfa_included": true,
+      "use_scaling_factor": true,
+      "finish_type": "FF05",
+      "ceiling_type": "CL0",
+      "slab_thickness_in": 8
+    },
+    {
+      "category": "Support Areas",
+      "space_name": "Bicycle Room",
+      "gba_included": true,
+      "gfa_included": false,
+      "use_scaling_factor": false,
+      "finish_type": "FF07",
+      "ceiling_type": "CL0",
+      "slab_thickness_in": 8
+    },
+    {
+      "category": "Support Areas",
+      "space_name": "Common Laundry Room",
+      "gba_included": true,
+      "gfa_included": true,
+      "use_scaling_factor": true,
+      "finish_type": "FF02",
+      "ceiling_type": "CL2",
+      "slab_thickness_in": 8
+    },
+    {
+      "category": "Support Areas",
+      "space_name": "Elevator Machine Room (Interior)",
+      "gba_included": true,
+      "gfa_included": false,
+      "use_scaling_factor": false,
+      "finish_type": "FF05",
+      "ceiling_type": "CL0",
+      "slab_thickness_in": 8
+    },
+    {
+      "category": "Support Areas",
+      "space_name": "Elevator Machine Room (Roof)",
+      "gba_included": false,
+      "gfa_included": false,
+      "use_scaling_factor": false,
+      "finish_type": "FF05",
+      "ceiling_type": "CL0",
+      "slab_thickness_in": 8
+    },
+    {
+      "category": "Support Areas",
+      "space_name": "Entry Lobby",
+      "gba_included": true,
+      "gfa_included": true,
+      "use_scaling_factor": true,
+      "finish_type": "FF04",
+      "ceiling_type": "CL3",
+      "slab_thickness_in": 8
+    },
+    {
+      "category": "Support Areas",
+      "space_name": "Mail Room / Mail Area",
+      "gba_included": true,
+      "gfa_included": true,
+      "use_scaling_factor": true,
+      "finish_type": "FF04",
+      "ceiling_type": "CL3",
+      "slab_thickness_in": 8
+    },
+    {
+      "category": "Support Areas",
+      "space_name": "Storage Room - General / Maintenance",
+      "gba_included": true,
+      "gfa_included": true,
+      "use_scaling_factor": true,
+      "finish_type": "FF07",
+      "ceiling_type": "CL0",
+      "slab_thickness_in": 8
+    },
+    {
+      "category": "Support Areas",
+      "space_name": "Storage Room - Janitor's Closet",
+      "gba_included": true,
+      "gfa_included": true,
+      "use_scaling_factor": true,
+      "finish_type": "FF05",
+      "ceiling_type": "CL0",
+      "slab_thickness_in": 8
+    },
+    {
+      "category": "Support Areas",
+      "space_name": "Storage Room - Cold Storage Delivery Room",
+      "gba_included": true,
+      "gfa_included": true,
+      "use_scaling_factor": true,
+      "finish_type": "FF06",
+      "ceiling_type": "CL0",
+      "slab_thickness_in": 8
+    },
+    {
+      "category": "Support Areas",
+      "space_name": "Storage Room - Parcels",
+      "gba_included": true,
+      "gfa_included": true,
+      "use_scaling_factor": true,
+      "finish_type": "FF04",
+      "ceiling_type": "CL3",
+      "slab_thickness_in": 8
+    },
+    {
+      "category": "Support Areas",
+      "space_name": "Trash - Trash / Recycle Room (Typical)",
+      "gba_included": true,
+      "gfa_included": true,
+      "use_scaling_factor": true,
+      "finish_type": "FF05",
+      "ceiling_type": "CL0",
+      "slab_thickness_in": 8
+    },
+    {
+      "category": "Support Areas",
+      "space_name": "Trash - Trash Vestibules at Res Floors (Typical)",
+      "gba_included": true,
+      "gfa_included": true,
+      "use_scaling_factor": true,
+      "finish_type": "FF02",
+      "ceiling_type": "CL2",
+      "slab_thickness_in": 8
+    },
+    {
+      "category": "Support Areas",
+      "space_name": "Trash - Recycling Room",
+      "gba_included": true,
+      "gfa_included": true,
+      "use_scaling_factor": true,
+      "finish_type": "FF05",
+      "ceiling_type": "CL0",
+      "slab_thickness_in": 8
+    },
+    {
+      "category": "Support Areas",
+      "space_name": "Trash - Compactor Room",
+      "gba_included": true,
+      "gfa_included": true,
+      "use_scaling_factor": true,
+      "finish_type": "FF06",
+      "ceiling_type": "CL0",
+      "slab_thickness_in": 10
+    },
+    {
+      "category": "Support Areas",
+      "space_name": "Trash - Compost Room",
+      "gba_included": true,
+      "gfa_included": true,
+      "use_scaling_factor": true,
+      "finish_type": "FF05",
+      "ceiling_type": "CL0",
+      "slab_thickness_in": 8
+    },
+    {
+      "category": "Staff / Management",
+      "space_name": "Leasing Office",
+      "gba_included": true,
+      "gfa_included": true,
+      "use_scaling_factor": true,
+      "finish_type": "FF01",
+      "ceiling_type": "CL1",
+      "slab_thickness_in": 7
+    },
+    {
+      "category": "Staff / Management",
+      "space_name": "Manager's Office",
+      "gba_included": true,
+      "gfa_included": true,
+      "use_scaling_factor": true,
+      "finish_type": "FF01",
+      "ceiling_type": "CL1",
+      "slab_thickness_in": 7
+    },
+    {
+      "category": "Staff / Management",
+      "space_name": "Parking Control Room",
+      "gba_included": true,
+      "gfa_included": true,
+      "use_scaling_factor": true,
+      "finish_type": "FF01",
+      "ceiling_type": "CL1",
+      "slab_thickness_in": 7
+    },
+    {
+      "category": "Staff / Management",
+      "space_name": "CCTV / IT / Security Equipment Rooms",
+      "gba_included": true,
+      "gfa_included": false,
+      "use_scaling_factor": false,
+      "finish_type": "FF05",
+      "ceiling_type": "CL0",
+      "slab_thickness_in": 7
+    },
+    {
+      "category": "Staff / Management",
+      "space_name": "Staff Break Room",
+      "gba_included": true,
+      "gfa_included": true,
+      "use_scaling_factor": true,
+      "finish_type": "FF01",
+      "ceiling_type": "CL1",
+      "slab_thickness_in": 7
+    },
+    {
+      "category": "Staff / Management",
+      "space_name": "Staff Lockers & Showers",
+      "gba_included": true,
+      "gfa_included": true,
+      "use_scaling_factor": true,
+      "finish_type": "FF02",
+      "ceiling_type": "CL2",
+      "slab_thickness_in": 7
+    },
+    {
+      "category": "Staff / Management",
+      "space_name": "Staff Restroom",
+      "gba_included": true,
+      "gfa_included": true,
+      "use_scaling_factor": true,
+      "finish_type": "FF02",
+      "ceiling_type": "CL2",
+      "slab_thickness_in": 7
+    },
+    {
+      "category": "Amenities – Indoor",
+      "space_name": "Art Studio",
+      "gba_included": true,
+      "gfa_included": true,
+      "use_scaling_factor": true,
+      "finish_type": "FF05",
+      "ceiling_type": "CL1",
+      "slab_thickness_in": 7
+    },
+    {
+      "category": "Amenities – Indoor",
+      "space_name": "Bar / Café Nook",
+      "gba_included": true,
+      "gfa_included": true,
+      "use_scaling_factor": true,
+      "finish_type": "FF01",
+      "ceiling_type": "CL1",
+      "slab_thickness_in": 7
+    },
+    {
+      "category": "Amenities – Indoor",
+      "space_name": "Business Center / Coworking",
+      "gba_included": true,
+      "gfa_included": true,
+      "use_scaling_factor": true,
+      "finish_type": "FF03",
+      "ceiling_type": "CL1",
+      "slab_thickness_in": 7
+    },
+    {
+      "category": "Amenities – Indoor",
+      "space_name": "Children’s Play Area",
+      "gba_included": true,
+      "gfa_included": true,
+      "use_scaling_factor": true,
+      "finish_type": "FF09",
+      "ceiling_type": "CL1",
+      "slab_thickness_in": 7
+    },
+    {
+      "category": "Amenities – Indoor",
+      "space_name": "Commercial Kitchen",
+      "gba_included": true,
+      "gfa_included": true,
+      "use_scaling_factor": true,
+      "finish_type": "FF06",
+      "ceiling_type": "CL2",
+      "slab_thickness_in": 9
+    },
+    {
+      "category": "Amenities – Indoor",
+      "space_name": "Community / Multi-Purpose Room",
+      "gba_included": true,
+      "gfa_included": true,
+      "use_scaling_factor": true,
+      "finish_type": "FF01",
+      "ceiling_type": "CL1",
+      "slab_thickness_in": 7
+    },
+    {
+      "category": "Amenities – Indoor",
+      "space_name": "Concierge Desk",
+      "gba_included": true,
+      "gfa_included": true,
+      "use_scaling_factor": true,
+      "finish_type": "FF04",
+      "ceiling_type": "CL3",
+      "slab_thickness_in": 7
+    },
+    {
+      "category": "Amenities – Indoor",
+      "space_name": "Conference Room",
+      "gba_included": true,
+      "gfa_included": true,
+      "use_scaling_factor": true,
+      "finish_type": "FF03",
+      "ceiling_type": "CL1",
+      "slab_thickness_in": 7
+    },
+    {
+      "category": "Amenities – Indoor",
+      "space_name": "Dining Room",
+      "gba_included": true,
+      "gfa_included": true,
+      "use_scaling_factor": true,
+      "finish_type": "FF01",
+      "ceiling_type": "CL1",
+      "slab_thickness_in": 7
+    },
+    {
+      "category": "Amenities – Indoor",
+      "space_name": "Dog Washing Room",
+      "gba_included": true,
+      "gfa_included": true,
+      "use_scaling_factor": true,
+      "finish_type": "FF02",
+      "ceiling_type": "CL2",
+      "slab_thickness_in": 7
+    },
+    {
+      "category": "Amenities – Indoor",
+      "space_name": "Fitness Room",
+      "gba_included": true,
+      "gfa_included": true,
+      "use_scaling_factor": true,
+      "finish_type": "FF09",
+      "ceiling_type": "CL1",
+      "slab_thickness_in": 9
+    },
+    {
+      "category": "Amenities – Indoor",
+      "space_name": "Game Room",
+      "gba_included": true,
+      "gfa_included": true,
+      "use_scaling_factor": true,
+      "finish_type": "FF03",
+      "ceiling_type": "CL1",
+      "slab_thickness_in": 7
+    },
+    {
+      "category": "Amenities – Indoor",
+      "space_name": "Golf Simulator Room",
+      "gba_included": true,
+      "gfa_included": true,
+      "use_scaling_factor": true,
+      "finish_type": "FF03",
+      "ceiling_type": "CL1",
+      "slab_thickness_in": 9
+    },
+    {
+      "category": "Amenities – Indoor",
+      "space_name": "Library / Reading Lounge",
+      "gba_included": true,
+      "gfa_included": true,
+      "use_scaling_factor": true,
+      "finish_type": "FF03",
+      "ceiling_type": "CL1",
+      "slab_thickness_in": 7
+    },
+    {
+      "category": "Amenities – Indoor",
+      "space_name": "Massage / Treatment Room",
+      "gba_included": true,
+      "gfa_included": true,
+      "use_scaling_factor": true,
+      "finish_type": "FF01",
+      "ceiling_type": "CL1",
+      "slab_thickness_in": 7
+    },
+    {
+      "category": "Amenities – Indoor",
+      "space_name": "Podcast Room",
+      "gba_included": true,
+      "gfa_included": true,
+      "use_scaling_factor": true,
+      "finish_type": "FF02",
+      "ceiling_type": "CL3",
+      "slab_thickness_in": 7
+    },
+    {
+      "category": "Amenities – Indoor",
+      "space_name": "Recording Room",
+      "gba_included": true,
+      "gfa_included": true,
+      "use_scaling_factor": true,
+      "finish_type": "FF03",
+      "ceiling_type": "CL3",
+      "slab_thickness_in": 7
+    },
+    {
+      "category": "Amenities – Indoor",
+      "space_name": "Sauna / Steam Room",
+      "gba_included": true,
+      "gfa_included": true,
+      "use_scaling_factor": true,
+      "finish_type": "FF02",
+      "ceiling_type": "CL4",
+      "slab_thickness_in": 7
+    },
+    {
+      "category": "Amenities – Indoor",
+      "space_name": "Shower / Changing Room",
+      "gba_included": true,
+      "gfa_included": true,
+      "use_scaling_factor": true,
+      "finish_type": "FF02",
+      "ceiling_type": "CL2",
+      "slab_thickness_in": 7
+    },
+    {
+      "category": "Amenities – Indoor",
+      "space_name": "Spa / Wellness Center",
+      "gba_included": true,
+      "gfa_included": true,
+      "use_scaling_factor": true,
+      "finish_type": "FF01",
+      "ceiling_type": "CL1",
+      "slab_thickness_in": 7
+    },
+    {
+      "category": "Amenities – Indoor",
+      "space_name": "Spin Studio",
+      "gba_included": true,
+      "gfa_included": true,
+      "use_scaling_factor": true,
+      "finish_type": "FF09",
+      "ceiling_type": "CL1",
+      "slab_thickness_in": 9
+    },
+    {
+      "category": "Amenities – Indoor",
+      "space_name": "Amenity Storage Room",
+      "gba_included": true,
+      "gfa_included": true,
+      "use_scaling_factor": true,
+      "finish_type": "FF07",
+      "ceiling_type": "CL0",
+      "slab_thickness_in": 7
+    },
+    {
+      "category": "Amenities – Indoor",
+      "space_name": "Theater / Screening Room",
+      "gba_included": true,
+      "gfa_included": true,
+      "use_scaling_factor": true,
+      "finish_type": "FF03",
+      "ceiling_type": "CL1",
+      "slab_thickness_in": 7
+    },
+    {
+      "category": "Amenities – Indoor",
+      "space_name": "Yoga / Pilates Room",
+      "gba_included": true,
+      "gfa_included": true,
+      "use_scaling_factor": true,
+      "finish_type": "FF01",
+      "ceiling_type": "CL1",
+      "slab_thickness_in": 7
+    },
+    {
+      "category": "Amenities – Indoor",
+      "space_name": "Restroom for Residents",
+      "gba_included": true,
+      "gfa_included": true,
+      "use_scaling_factor": true,
+      "finish_type": "FF02",
+      "ceiling_type": "CL2",
+      "slab_thickness_in": 7
+    },
+    {
+      "category": "Amenities – Outdoor",
+      "space_name": "Outdoor Bar Area",
+      "gba_included": false,
+      "gfa_included": false,
+      "use_scaling_factor": false,
+      "finish_type": "FF11",
+      "ceiling_type": null,
+      "slab_thickness_in": null
+    },
+    {
+      "category": "Amenities – Outdoor",
+      "space_name": "BBQ Stations",
+      "gba_included": false,
+      "gfa_included": false,
+      "use_scaling_factor": false,
+      "finish_type": "FF11",
+      "ceiling_type": null,
+      "slab_thickness_in": null
+    },
+    {
+      "category": "Amenities – Outdoor",
+      "space_name": "Cabanas",
+      "gba_included": false,
+      "gfa_included": false,
+      "use_scaling_factor": false,
+      "finish_type": "FF11",
+      "ceiling_type": null,
+      "slab_thickness_in": null
+    },
+    {
+      "category": "Amenities – Outdoor",
+      "space_name": "Fire Pit(s)",
+      "gba_included": false,
+      "gfa_included": false,
+      "use_scaling_factor": false,
+      "finish_type": "FF11",
+      "ceiling_type": null,
+      "slab_thickness_in": null
+    },
+    {
+      "category": "Amenities – Outdoor",
+      "space_name": "Gazebos",
+      "gba_included": false,
+      "gfa_included": false,
+      "use_scaling_factor": false,
+      "finish_type": "FF11",
+      "ceiling_type": null,
+      "slab_thickness_in": null
+    },
+    {
+      "category": "Amenities – Outdoor",
+      "space_name": "Movie Screening Area",
+      "gba_included": false,
+      "gfa_included": false,
+      "use_scaling_factor": false,
+      "finish_type": "FF11",
+      "ceiling_type": null,
+      "slab_thickness_in": null
+    },
+    {
+      "category": "Amenities – Outdoor",
+      "space_name": "Outdoor Kitchen",
+      "gba_included": false,
+      "gfa_included": false,
+      "use_scaling_factor": false,
+      "finish_type": "FF11",
+      "ceiling_type": null,
+      "slab_thickness_in": null
+    },
+    {
+      "category": "Amenities – Outdoor",
+      "space_name": "Seating / Tables",
+      "gba_included": false,
+      "gfa_included": false,
+      "use_scaling_factor": false,
+      "finish_type": "FF11",
+      "ceiling_type": null,
+      "slab_thickness_in": null
+    },
+    {
+      "category": "Amenities – Outdoor",
+      "space_name": "Courts - Sports",
+      "gba_included": false,
+      "gfa_included": false,
+      "use_scaling_factor": false,
+      "finish_type": "FF13",
+      "ceiling_type": null,
+      "slab_thickness_in": null
+    },
+    {
+      "category": "Amenities – Outdoor",
+      "space_name": "Outdoor Shower(s)",
+      "gba_included": false,
+      "gfa_included": false,
+      "use_scaling_factor": false,
+      "finish_type": "FF12",
+      "ceiling_type": null,
+      "slab_thickness_in": null
+    },
+    {
+      "category": "Amenities – Outdoor",
+      "space_name": "Pets - Dog Run / Pet Park",
+      "gba_included": false,
+      "gfa_included": false,
+      "use_scaling_factor": false,
+      "finish_type": "FF14",
+      "ceiling_type": null,
+      "slab_thickness_in": null
+    },
+    {
+      "category": "Amenities – Outdoor",
+      "space_name": "Pets - Dog Washing Station",
+      "gba_included": false,
+      "gfa_included": false,
+      "use_scaling_factor": false,
+      "finish_type": "FF10",
+      "ceiling_type": null,
+      "slab_thickness_in": null
+    },
+    {
+      "category": "Amenities – Outdoor",
+      "space_name": "Planters - Community Garden",
+      "gba_included": false,
+      "gfa_included": false,
+      "use_scaling_factor": false,
+      "finish_type": "FF10",
+      "ceiling_type": null,
+      "slab_thickness_in": null
+    },
+    {
+      "category": "Amenities – Outdoor",
+      "space_name": "Outdoor Spa",
+      "gba_included": false,
+      "gfa_included": false,
+      "use_scaling_factor": false,
+      "finish_type": "FF12",
+      "ceiling_type": null,
+      "slab_thickness_in": null
+    },
+    {
+      "category": "Amenities – Outdoor",
+      "space_name": "Swimming Pool",
+      "gba_included": false,
+      "gfa_included": false,
+      "use_scaling_factor": false,
+      "finish_type": "FF12",
+      "ceiling_type": null,
+      "slab_thickness_in": null
+    },
+    {
+      "category": "Amenities – Outdoor",
+      "space_name": "Tot Lot / Children’s Play Area",
+      "gba_included": false,
+      "gfa_included": false,
+      "use_scaling_factor": false,
+      "finish_type": "FF15",
+      "ceiling_type": null,
+      "slab_thickness_in": null
+    },
+    {
+      "category": "Amenities – Outdoor",
+      "space_name": "Outdoor Amenity Circulation",
+      "gba_included": false,
+      "gfa_included": false,
+      "use_scaling_factor": false,
+      "finish_type": "FF10",
+      "ceiling_type": null,
+      "slab_thickness_in": null
+    },
+    {
+      "category": "Amenities – Outdoor",
+      "space_name": "Planters - Landscaped Area",
+      "gba_included": false,
+      "gfa_included": false,
+      "use_scaling_factor": false,
+      "finish_type": null,
+      "ceiling_type": null,
+      "slab_thickness_in": null
+    },
+    {
+      "category": "Parking",
+      "space_name": "Parking - Indoor (Underground + Podium)",
+      "gba_included": true,
+      "gfa_included": false,
+      "use_scaling_factor": false,
+      "finish_type": "FF08",
+      "ceiling_type": null,
+      "slab_thickness_in": 8
+    },
+    {
+      "category": "Parking",
+      "space_name": "Parking - Surface Lot",
+      "gba_included": false,
+      "gfa_included": false,
+      "use_scaling_factor": false,
+      "finish_type": null,
+      "ceiling_type": null,
+      "slab_thickness_in": null
+    },
+    {
+      "category": "Parking",
+      "space_name": "Loading Dock",
+      "gba_included": true,
+      "gfa_included": false,
+      "use_scaling_factor": false,
+      "finish_type": "FF07",
+      "ceiling_type": null,
+      "slab_thickness_in": 12
+    },
+    {
+      "category": "Parking",
+      "space_name": "Temp Loading Zone / Ride-share",
+      "gba_included": true,
+      "gfa_included": false,
+      "use_scaling_factor": false,
+      "finish_type": "FF10",
+      "ceiling_type": null,
+      "slab_thickness_in": 8
+    },
+    {
+      "category": "Low Voltage",
+      "space_name": "MPOE Room",
+      "gba_included": true,
+      "gfa_included": false,
+      "use_scaling_factor": false,
+      "finish_type": "FF05",
+      "ceiling_type": null,
+      "slab_thickness_in": 7
+    },
+    {
+      "category": "Low Voltage",
+      "space_name": "IDF Closets",
+      "gba_included": true,
+      "gfa_included": false,
+      "use_scaling_factor": false,
+      "finish_type": "FF05",
+      "ceiling_type": null,
+      "slab_thickness_in": 7
+    },
+    {
+      "category": "Low Voltage",
+      "space_name": "DAS (ERRCS) Room",
+      "gba_included": true,
+      "gfa_included": false,
+      "use_scaling_factor": false,
+      "finish_type": "FF05",
+      "ceiling_type": null,
+      "slab_thickness_in": 7
+    },
+    {
+      "category": "Dry Utilities",
+      "space_name": "Electrical Utilty Infrastructure - Exterior",
+      "gba_included": false,
+      "gfa_included": false,
+      "use_scaling_factor": false,
+      "finish_type": null,
+      "ceiling_type": null,
+      "slab_thickness_in": null
+    },
+    {
+      "category": "Dry Utilities",
+      "space_name": "Electrical Utility - Customer Station (indoor)",
+      "gba_included": true,
+      "gfa_included": false,
+      "use_scaling_factor": false,
+      "finish_type": "FF05",
+      "ceiling_type": null,
+      "slab_thickness_in": 7
+    },
+    {
+      "category": "Dry Utilities",
+      "space_name": "Gas Utility - Indoor Meter Room",
+      "gba_included": true,
+      "gfa_included": false,
+      "use_scaling_factor": false,
+      "finish_type": "FF07",
+      "ceiling_type": null,
+      "slab_thickness_in": 7
+    },
+    {
+      "category": "BOH – Electrical",
+      "space_name": "Main Electrical Room",
+      "gba_included": true,
+      "gfa_included": false,
+      "use_scaling_factor": false,
+      "finish_type": "FF05",
+      "ceiling_type": null,
+      "slab_thickness_in": 8
+    },
+    {
+      "category": "BOH – Electrical",
+      "space_name": "Sub Electrical Room(s)",
+      "gba_included": true,
+      "gfa_included": false,
+      "use_scaling_factor": false,
+      "finish_type": "FF05",
+      "ceiling_type": null,
+      "slab_thickness_in": 8
+    },
+    {
+      "category": "BOH – Electrical",
+      "space_name": "Automatic Transfer Switch (ATS) Room (Emergency equipment)",
+      "gba_included": true,
+      "gfa_included": false,
+      "use_scaling_factor": false,
+      "finish_type": "FF05",
+      "ceiling_type": null,
+      "slab_thickness_in": 9
+    },
+    {
+      "category": "BOH – Electrical",
+      "space_name": "Generator Room",
+      "gba_included": true,
+      "gfa_included": false,
+      "use_scaling_factor": false,
+      "finish_type": "FF05",
+      "ceiling_type": null,
+      "slab_thickness_in": 10
+    },
+    {
+      "category": "BOH – Electrical",
+      "space_name": "Emergency Lighting Inverter Room",
+      "gba_included": true,
+      "gfa_included": false,
+      "use_scaling_factor": false,
+      "finish_type": "FF05",
+      "ceiling_type": null,
+      "slab_thickness_in": 8
+    },
+    {
+      "category": "BOH – Electrical",
+      "space_name": "Solar Battery Room / UPS Room",
+      "gba_included": true,
+      "gfa_included": false,
+      "use_scaling_factor": false,
+      "finish_type": "FF05",
+      "ceiling_type": null,
+      "slab_thickness_in": 10
+    },
+    {
+      "category": "BOH – Mechanical",
+      "space_name": "Fan Room / Air Handling Unit (AHU) Room",
+      "gba_included": false,
+      "gfa_included": false,
+      "use_scaling_factor": false,
+      "finish_type": null,
+      "ceiling_type": null,
+      "slab_thickness_in": null
+    },
+    {
+      "category": "BOH – Mechanical",
+      "space_name": "Mechanical Pad for HVAC Equipment (Outdoor)",
+      "gba_included": false,
+      "gfa_included": false,
+      "use_scaling_factor": false,
+      "finish_type": null,
+      "ceiling_type": null,
+      "slab_thickness_in": null
+    },
+    {
+      "category": "BOH – Mechanical",
+      "space_name": "Mechanical Shaft / Vertical Riser Space - Commercial Kitchen",
+      "gba_included": false,
+      "gfa_included": false,
+      "use_scaling_factor": false,
+      "finish_type": null,
+      "ceiling_type": null,
+      "slab_thickness_in": null
+    },
+    {
+      "category": "BOH – Mechanical",
+      "space_name": "Mechanical Shaft / Vertical Riser Space - Ventilation & Ref. Lines",
+      "gba_included": false,
+      "gfa_included": false,
+      "use_scaling_factor": false,
+      "finish_type": null,
+      "ceiling_type": null,
+      "slab_thickness_in": null
+    },
+    {
+      "category": "BOH – Plumbing",
+      "space_name": "Domestic Water Booster Pump Room",
+      "gba_included": true,
+      "gfa_included": false,
+      "use_scaling_factor": false,
+      "finish_type": "FF05",
+      "ceiling_type": null,
+      "slab_thickness_in": 8
+    },
+    {
+      "category": "BOH – Plumbing",
+      "space_name": "Cistern Water Storage/Tank Room",
+      "gba_included": true,
+      "gfa_included": false,
+      "use_scaling_factor": false,
+      "finish_type": "FF05",
+      "ceiling_type": null,
+      "slab_thickness_in": 8
+    },
+    {
+      "category": "BOH – Plumbing",
+      "space_name": "Backflow Preventer Room/Alcove/Space",
+      "gba_included": true,
+      "gfa_included": false,
+      "use_scaling_factor": false,
+      "finish_type": "FF05",
+      "ceiling_type": null,
+      "slab_thickness_in": 7
+    },
+    {
+      "category": "BOH – Plumbing",
+      "space_name": "Gas Meter Space/Alcove",
+      "gba_included": true,
+      "gfa_included": false,
+      "use_scaling_factor": false,
+      "finish_type": "FF07",
+      "ceiling_type": null,
+      "slab_thickness_in": 7
+    },
+    {
+      "category": "BOH – Plumbing",
+      "space_name": "Grease Interceptor Room",
+      "gba_included": true,
+      "gfa_included": false,
+      "use_scaling_factor": false,
+      "finish_type": "FF06",
+      "ceiling_type": null,
+      "slab_thickness_in": 10
+    },
+    {
+      "category": "BOH – Plumbing",
+      "space_name": "Central Water Heating Room (Indoor)",
+      "gba_included": true,
+      "gfa_included": false,
+      "use_scaling_factor": false,
+      "finish_type": "FF05",
+      "ceiling_type": null,
+      "slab_thickness_in": 10
+    },
+    {
+      "category": "BOH – Plumbing",
+      "space_name": "Central Water Heating Pad (Outdoor)",
+      "gba_included": false,
+      "gfa_included": false,
+      "use_scaling_factor": false,
+      "finish_type": null,
+      "ceiling_type": null,
+      "slab_thickness_in": null
+    },
+    {
+      "category": "BOH – Plumbing",
+      "space_name": "Graywater System Room",
+      "gba_included": true,
+      "gfa_included": false,
+      "use_scaling_factor": false,
+      "finish_type": "FF05",
+      "ceiling_type": null,
+      "slab_thickness_in": 10
+    },
+    {
+      "category": "BOH – Plumbing",
+      "space_name": "Shaft - Plumbing Risers",
+      "gba_included": true,
+      "gfa_included": false,
+      "use_scaling_factor": false,
+      "finish_type": null,
+      "ceiling_type": null,
+      "slab_thickness_in": null
+    },
+    {
+      "category": "BOH – Plumbing",
+      "space_name": "Water PRV Closet",
+      "gba_included": true,
+      "gfa_included": false,
+      "use_scaling_factor": false,
+      "finish_type": "FF05",
+      "ceiling_type": null,
+      "slab_thickness_in": 7
+    },
+    {
+      "category": "BOH – Plumbing",
+      "space_name": "Water Filtration/Conditioning Room",
+      "gba_included": true,
+      "gfa_included": false,
+      "use_scaling_factor": false,
+      "finish_type": "FF05",
+      "ceiling_type": null,
+      "slab_thickness_in": 7
+    },
+    {
+      "category": "BOH – Plumbing",
+      "space_name": "Rain Water Harvesting Room",
+      "gba_included": true,
+      "gfa_included": false,
+      "use_scaling_factor": false,
+      "finish_type": "FF05",
+      "ceiling_type": null,
+      "slab_thickness_in": 10
+    },
+    {
+      "category": "BOH – Fire Sprinkler",
+      "space_name": "Fire Pump Room",
+      "gba_included": true,
+      "gfa_included": false,
+      "use_scaling_factor": false,
+      "finish_type": "FF05",
+      "ceiling_type": null,
+      "slab_thickness_in": 8
+    },
+    {
+      "category": "BOH – Fire Sprinkler",
+      "space_name": "Fire Control Room",
+      "gba_included": true,
+      "gfa_included": false,
+      "use_scaling_factor": false,
+      "finish_type": "FF05",
+      "ceiling_type": null,
+      "slab_thickness_in": 7
+    },
+    {
+      "category": "BOH – Fire Sprinkler",
+      "space_name": "Sprinkler Riser Closets",
+      "gba_included": true,
+      "gfa_included": false,
+      "use_scaling_factor": false,
+      "finish_type": "FF07",
+      "ceiling_type": null,
+      "slab_thickness_in": 7
+    }
+  ],
+  "code_profiles": {
+    "base_profiles": {
+      "ibc_2021": {
+        "edition": "ibc_2021",
+        "means_of_egress": {
+          "min_corridor_clear_width_ft": 4.0,
+          "occupant_load_factor_residential_sf_per_occ": 200.0,
+          "exit_access_travel_sprinklered_ft": 250.0,
+          "stair_width_per_occ_in": 0.3,
+          "stair_width_min_in": 44.0
+        },
+        "podium": {
+          "hybrid_podium_enabled": true,
+          "upper_lower_split_mode": "section_510_2_style"
+        },
+        "parking_defaults": {
+          "retail_sf_per_stall": 300.0,
+          "surface_area_ratio": 0.9
+        }
+      },
+      "ibc_2024": {
+        "edition": "ibc_2024",
+        "means_of_egress": {
+          "min_corridor_clear_width_ft": 4.0,
+          "occupant_load_factor_residential_sf_per_occ": 200.0,
+          "exit_access_travel_sprinklered_ft": 250.0,
+          "stair_width_per_occ_in": 0.3,
+          "stair_width_min_in": 44.0
+        },
+        "podium": {
+          "hybrid_podium_enabled": true,
+          "upper_lower_split_mode": "section_510_2_style"
+        },
+        "parking_defaults": {
+          "retail_sf_per_stall": 300.0,
+          "surface_area_ratio": 0.9
+        }
+      }
+    },
+    "state_overlays": {
+      "none": {
+        "tags": []
+      },
+      "ca_2022_title24": {
+        "tags": [
+          "ca_2022_title24",
+          "transit_reduction_enabled",
+          "title24_energy_context"
+        ],
+        "parking": {
+          "transit_stop_reduction_enabled": true,
+          "affordable_housing_reduction_enabled": true
+        }
+      },
+      "ca_2025_title24": {
+        "tags": [
+          "ca_2025_title24",
+          "transit_reduction_enabled",
+          "title24_energy_context"
+        ],
+        "parking": {
+          "transit_stop_reduction_enabled": true,
+          "affordable_housing_reduction_enabled": true
+        }
+      },
+      "fl_2023_fbc": {
+        "tags": [
+          "fl_2023_fbc"
+        ],
+        "parking": {
+          "transit_stop_reduction_enabled": false,
+          "affordable_housing_reduction_enabled": false
+        }
+      }
+    },
+    "local_overlay_policy": {
+      "allow_numeric_overrides": true,
+      "allow_text_tags": true,
+      "unrecognized_numeric_overrides_trigger_manual_review": true
+    }
+  },
+  "shape_priors": {
+    "bar": {
+      "seed_coverage_ratio": 0.52,
+      "target_wing_count": 1,
+      "max_corners": 4,
+      "preferred_core_band": "central_longitudinal",
+      "expected_cycle_count": 0,
+      "expected_branch_count": 0,
+      "strategy_family": "linear_spine"
+    },
+    "l_shape": {
+      "seed_coverage_ratio": 0.58,
+      "target_wing_count": 2,
+      "inside_corner_count": 1,
+      "preferred_core_band": "elbow_or_joint",
+      "expected_cycle_count": 0,
+      "expected_branch_count": 1,
+      "strategy_family": "elbow_two_arm"
+    },
+    "u_shape": {
+      "seed_coverage_ratio": 0.63,
+      "target_wing_count": 3,
+      "min_courtyard_width_ft": 40.0,
+      "preferred_core_band": "bridge",
+      "expected_cycle_count": 0,
+      "expected_branch_count": 2,
+      "strategy_family": "courtyard_open_ring"
+    },
+    "o_shape": {
+      "seed_coverage_ratio": 0.72,
+      "target_wing_count": 4,
+      "min_courtyard_width_ft": 45.0,
+      "preferred_core_band": "distributed_ring",
+      "expected_cycle_count": 1,
+      "expected_branch_count": 0,
+      "strategy_family": "closed_ring"
+    },
+    "h_shape": {
+      "seed_coverage_ratio": 0.6,
+      "target_wing_count": 3,
+      "bridge_count": 1,
+      "preferred_core_band": "bridge_joint",
+      "expected_cycle_count": 0,
+      "expected_branch_count": 2,
+      "strategy_family": "dual_bar_bridge"
+    },
+    "tower": {
+      "seed_coverage_ratio": 0.34,
+      "target_wing_count": 0,
+      "preferred_core_band": "central_compact",
+      "tower_core_area_ratio": 0.18,
+      "expected_cycle_count": 0,
+      "expected_branch_count": 0,
+      "strategy_family": "compact_core_perimeter"
+    },
+    "x_shape": {
+      "seed_coverage_ratio": 0.4,
+      "target_wing_count": 4,
+      "preferred_core_band": "central_cross",
+      "expected_cycle_count": 0,
+      "expected_branch_count": 4,
+      "strategy_family": "hub_four_arm"
+    },
+    "cluster": {
+      "seed_coverage_ratio": 0.48,
+      "target_cluster_count": 3,
+      "preferred_core_band": "distributed",
+      "expected_cycle_count": 0,
+      "expected_branch_count": 3,
+      "strategy_family": "multi_lobe"
+    },
+    "free_form": {
+      "seed_coverage_ratio": 0.5,
+      "skeleton_solver": "medial_axis",
+      "preferred_core_band": "adaptive",
+      "expected_cycle_count": 0,
+      "expected_branch_count": 3,
+      "strategy_family": "hybrid_decomposition"
+    },
+    "perimeter_partial": {
+      "seed_coverage_ratio": 0.68,
+      "target_wing_count": 3,
+      "min_courtyard_width_ft": 35.0,
+      "preferred_core_band": "edge_bridge",
+      "expected_cycle_count": 0,
+      "expected_branch_count": 2,
+      "strategy_family": "open_ring_hybrid"
+    }
+  },
+  "story_search": {
+    "podium_story_bonus_factor": 1.08,
+    "upper_story_efficiency_floor": 0.82,
+    "min_fill_ratio_for_acceptance": 0.62,
+    "story_search_penalties": {
+      "high_vertical_penalty_weight": 0.12,
+      "repeatability_break_penalty_weight": 0.18,
+      "podium_mismatch_penalty_weight": 0.15
+    }
+  },
+  "yield_scoring": {
+    "rent_multiplier_curve": {
+      "x_low_rent_per_sf": 3.0,
+      "x_high_rent_per_sf": 7.0,
+      "y_low_multiplier": 1.1,
+      "y_high_multiplier": 1.5,
+      "clamp_above_high": true
+    },
+    "size_multiplier_curve": {
+      "x_low_gba_sf": 20000.0,
+      "x_high_gba_sf": 800000.0,
+      "y_low_multiplier": 1.2,
+      "y_high_multiplier": 0.85
+    },
+    "amenity_effect_policy": {
+      "use_percent_effect_if_available": true,
+      "default_effect_if_missing": 0.0,
+      "cost_penalty_weight": 0.25
+    }
+  },
+  "threading": {
+    "candidate_parallel_enabled": true,
+    "floor_family_parallel_enabled": true,
+    "space_demand_parallel_enabled": true,
+    "default_max_threads": 8,
+    "stable_sort_results": true,
+    "notes_v13": [
+      "Candidate solving remains the first stable thread boundary.",
+      "Repo integration should not introduce nondeterministic ProjectDoc ordering; stable sort after threaded solve.",
+      "Future v14 may split floor-family repair and support-space demand into separate scoped thread pools."
+    ]
+  },
+  "formula_registry": {
+    "required": [
+      "site_area_polygon",
+      "footprint_seed_by_shape",
+      "residential_area_from_gfa",
+      "gfa_from_residential_area",
+      "unit_size_quantile_selection",
+      "softmax_mix_continuous",
+      "softmax_integer_repair",
+      "frontage_length",
+      "avg_unit_to_corridor_distance",
+      "corridor_length_area",
+      "elevator_lobby_geometry",
+      "surface_parking_geometry",
+      "rent_multiplier",
+      "size_multiplier",
+      "amenity_knapsack_value",
+      "primary_axis_from_frontage_or_pca",
+      "polygon_cross_section_depth_field",
+      "effective_facade_frontage",
+      "loaded_depth_target",
+      "frontage_demand_from_space_spans",
+      "residual_pocket_ratio",
+      "core_spine_offset",
+      "floor_allocation_score",
+      "cross_section_interval_field",
+      "interval_split_ratio",
+      "depth_break_ratio",
+      "frontage_run_merging",
+      "frontage_run_continuity_score",
+      "frontage_run_balance_score",
+      "convex_hull_concavity_ratio",
+      "residual_compactness_estimate",
+      "corridor_detour_ratio_estimate",
+      "service_reach_score",
+      "floor_topology_score",
+      "morphology_stable_segment_partition",
+      "morphology_junction_node_detection",
+      "morphology_cycle_detection",
+      "common_edge_capacity_fit",
+      "shape_match_score",
+      "bar_strategy_fit",
+      "l_shape_strategy_fit",
+      "u_shape_strategy_fit",
+      "o_shape_strategy_fit",
+      "h_shape_strategy_fit",
+      "tower_strategy_fit",
+      "x_shape_strategy_fit",
+      "cluster_strategy_fit",
+      "free_form_hybrid_strategy_fit",
+      "per_floor_shape_score",
+      "buildable_envelope_offset_repair",
+      "narrow_neck_split_detection",
+      "sliver_pruning_after_offset",
+      "cdt_dual_clearance_graph",
+      "cell_graph_band_extraction",
+      "corridor_spine_tree_with_loop_repair",
+      "frontage_slot_dp_packing",
+      "residual_polygon_classification",
+      "wet_wall_shaft_affinity",
+      "vertical_stack_local_repair",
+      "lexicographic_repair_objective_v18",
+      "structural_family_score",
+      "bay_grid_axis_inference",
+      "bay_fit_score",
+      "load_path_continuity_score",
+      "cantilever_burden_ratio",
+      "column_keepout_ratio",
+      "transfer_offset_penalty",
+      "room_structural_fit_score",
+      "wet_wall_stack_alignment_score",
+      "service_under_beam_capture_ratio",
+      "structure_driven_core_shift_penalty",
+      "torsion_proxy_penalty"
+    ],
+    "excluded_workbook_logic": [
+      "APT Logic"
+    ],
+    "active_semantic_sources": [
+      "DE OVERRIDE",
+      "APT CA1",
+      "APT CA2",
+      "APT Space"
+    ],
+    "cross_check_sources": [
+      "APT SA",
+      "APT MT",
+      "Gensler MEP "
+    ]
+  },
+  "repo_export_defaults": {
+    "enabled": false,
+    "integration_mode": "repo_case_generation",
+    "target_format": "gloq_project_doc_v1",
+    "space_name_mode": "semantic_category_index",
+    "include_engine_metadata": true,
+    "include_site_plan": true,
+    "case_group": "autolayout-v13",
+    "preferred_view": "site_plan",
+    "notes": [
+      "TypeScript remains the canonical ProjectDoc owner in the current GLOQSpaceAllocation contract.",
+      "ProjectDoc export is treated as a generated snapshot, not as a second domain owner.",
+      "Keep engine sidecar JSON next to exported ProjectDoc to avoid semantic loss."
+    ]
+  },
+  "feasibility_policy": {
+    "strict_repo_contract_default": true,
+    "mark_unclear_before_deep_solve_default": true,
+    "allow_deferred_zones_default": true,
+    "max_unclear_zones_default": 8,
+    "severity_routing": {
+      "info": "allow_solve_and_mark",
+      "warning": "allow_solve_and_mark",
+      "error": "defer_or_stop_depending_on_policy"
+    },
+    "deferred_zone_policy": {
+      "emit_register_before_deep_solve": true,
+      "emit_register_after_solve": true,
+      "recommended_version_fields": [
+        "v14",
+        "v15"
+      ]
+    },
+    "spatial_geometry_fail_as_deferred_default": true,
+    "max_floorplan_geometry_warnings_default": 1
+  },
+  "floor_stack_semantics": {
+    "total_levels_include_below_grade": true,
+    "intervals": {
+      "below_grade": "[0, below_grade_count)",
+      "podium": "[below_grade_count, below_grade_count + podium_levels)",
+      "upper_residential": "[below_grade_count + podium_levels, levels.count)"
+    },
+    "hard_constraints": [
+      "below_grade_count < levels.count",
+      "podium_levels < levels.count",
+      "below_grade_count + podium_levels < levels.count"
+    ],
+    "notes": [
+      "v13 fixes the v12 ambiguity where below-grade and podium ranges could overlap in solver indexing.",
+      "At least one upper residential level must remain after below-grade and podium allocation."
+    ]
+  },
+  "project_doc_mapping": {
+    "doc_fields": {
+      "id": "autolayout-{case_group}",
+      "name": "Autolayout {case_group}",
+      "defaultStoryHeightFt": "derived from level count heuristic",
+      "levels": "derived level stack",
+      "spaces": "polygon footprints per floor placement",
+      "sitePlan": "optional; edgeSetbacksFt currently defaults to uniform value"
+    },
+    "semantic_loss_fields": [
+      "space category",
+      "support-space semantic family",
+      "override lineage",
+      "assumption lineage",
+      "scoring breakdown"
+    ],
+    "preserve_in_sidecar_output": true
+  },
+  "unclear_zone_catalog": {
+    "local_overlay_missing": {
+      "severity": "warning",
+      "recommended_version": "v14"
+    },
+    "parking_ordinance_not_bound": {
+      "severity": "warning",
+      "recommended_version": "v14"
+    },
+    "repo_runtime_preview_not_contract_safe": {
+      "severity": "error",
+      "recommended_version": "v14"
+    },
+    "project_doc_semantic_loss": {
+      "severity": "info",
+      "recommended_version": "v14"
+    },
+    "complex_shape_template_uncertain": {
+      "severity": "warning",
+      "recommended_version": "v15"
+    },
+    "daylight_is_facade_proxy": {
+      "severity": "info",
+      "recommended_version": "v15"
+    },
+    "typical_floor_similarity_low": {
+      "severity": "warning",
+      "recommended_version": "v14"
+    },
+    "floor_stack_partition_invalid": {
+      "severity": "error",
+      "recommended_version": "v13"
+    },
+    "floorplan_frontage_overflow": {
+      "severity": "warning",
+      "recommended_version": "v16"
+    },
+    "floorplan_depth_fit_low": {
+      "severity": "warning",
+      "recommended_version": "v16"
+    },
+    "non_orthogonal_segment_sampling_loss": {
+      "severity": "warning",
+      "recommended_version": "v16"
+    },
+    "room_level_adjacency_not_solved": {
+      "severity": "info",
+      "recommended_version": "v16"
+    },
+    "structure_mep_not_bound": {
+      "severity": "warning",
+      "recommended_version": "v16"
+    },
+    "curved_geometry_not_canonical": {
+      "severity": "info",
+      "recommended_version": "v16"
+    },
+    "structural_family_low_confidence": {
+      "severity": "warning",
+      "recommended_version": "v21"
+    },
+    "bay_grid_fragmentation_high": {
+      "severity": "warning",
+      "recommended_version": "v21"
+    },
+    "transfer_structure_offset_high": {
+      "severity": "warning",
+      "recommended_version": "v21"
+    },
+    "room_structural_fit_low": {
+      "severity": "warning",
+      "recommended_version": "v21"
+    },
+    "roof_structure_capacity_not_solved": {
+      "severity": "info",
+      "recommended_version": "v21"
+    },
+    "site_exterior_retaining_drainage_not_solved": {
+      "severity": "info",
+      "recommended_version": "v21"
+    },
+    "shape_family_allocation_incomplete": {
+      "severity": "warning",
+      "route_to": "v24",
+      "notes": [
+        "Declared shape requires a pack the solver could not keep stable across allocation."
+      ]
+    },
+    "typical_floor_equivalence_exceeded": {
+      "severity": "warning",
+      "route_to": "v24",
+      "notes": [
+        "Typical floors in the same family diverge in gross or allocated area beyond the configured threshold."
+      ]
+    },
+    "floor_space_utilization_low": {
+      "severity": "warning",
+      "route_to": "v24",
+      "notes": [
+        "Buildable floor coverage remains below target after residual conversion and local repair."
+      ]
+    },
+    "space_overlap_remaining": {
+      "severity": "error",
+      "route_to": "v24",
+      "notes": [
+        "One or more space pairs still overlap beyond tolerance after local repair."
+      ]
+    },
+    "polygon_overlap_kernel_proxy_only": {
+      "severity": "info",
+      "route_to": "v24",
+      "notes": [
+        "Overlap detection still uses a rect/polygon proxy instead of a fully robust polygon boolean kernel."
+      ]
+    }
+  },
+  "site_controls": {
+    "default_edge_setback_ft": 8.0,
+    "setback_snap_ft": 0.5,
+    "min_buildable_area_sf": 8000.0,
+    "require_edge_setbacks_match_site_edges": true
+  },
+  "local_overlay_defaults": {
+    "binding_mode_default": "assumed",
+    "require_bound_overlay_for_active_parking": true,
+    "fallback_overlay_id": "__assumed_overlay__",
+    "numeric_defaults": {
+      "open_space_sf_per_du": 75.0,
+      "height_limit_stories_lowrise": 4,
+      "height_limit_stories_midrise": 8,
+      "height_limit_stories_highrise": 30,
+      "podium_max_frontage_ratio": 0.72
+    }
+  },
+  "parking_binding_defaults": {
+    "guest_stalls_per_du_default": 0.05,
+    "tdm_reduction_ratio_default": 0.0,
+    "compact_stall_ratio_default": 0.15,
+    "ev_ready_ratio_default": 0.2,
+    "accessible_stall_buffer_default": 2,
+    "binding_confidence_by_source": {
+      "local_overlay": "high",
+      "user_bound": "medium",
+      "heuristic_only": "low"
+    }
+  },
+  "repeatability_controls_defaults": {
+    "warn_threshold": 0.78,
+    "fail_threshold": 0.62,
+    "max_local_repair_area_ratio": 0.18,
+    "max_unit_order_swaps_per_floor": 2,
+    "allow_transfer_floor_split": true,
+    "enforce_core_lock_above_transfer": true
+  },
+  "corridor_optimization": {
+    "dead_end_threshold_ft": 35.0,
+    "max_notch_depth_ft": 14.0,
+    "frontage_utilization_target": 0.88,
+    "transfer_floor_repair_area_penalty": 0.08,
+    "single_loaded_preference_on_shallow_wings_ft": 30.0
+  },
+  "repo_projection_defaults": {
+    "projection_bundle_version": "gloq_projection_bundle_v1",
+    "projection_bundle_mode_default": "adjacent_json",
+    "include_semantic_index_default": true,
+    "include_level_family_index_default": true,
+    "runtime_preview_guard_default": "proposal_patch_only",
+    "semantic_loss_hard_limit_records": 0
+  },
+  "floor_geometry_reasoning": {
+    "primary_axis_mode_default": "frontage_then_pca",
+    "primary_axis_angle_snap_deg": 15.0,
+    "segment_sampling_step_ft": 8.0,
+    "facade_clearance_ft": 1.0,
+    "corner_clip_ft": 6.0,
+    "min_segment_length_ft": 22.0,
+    "band_depth_tolerance_ft": 2.0,
+    "segment_alignment_tolerance_deg": 18.0,
+    "residual_pocket_warn_ratio": 0.08,
+    "residual_pocket_fail_ratio": 0.14,
+    "frontage_utilization_target": 0.87,
+    "frontage_utilization_min": 0.72,
+    "depth_fit_warn_score": 0.75,
+    "depth_fit_fail_score": 0.6,
+    "core_spine_offset_warn_ft": 18.0,
+    "non_orthogonal_edge_warn_ratio": 0.35
+  },
+  "space_allocation_defaults": {
+    "partition_mode_default": "frontage_corridor_service",
+    "unit_frontage_buffer_ft": 2.0,
+    "entry_lobby_frontage_min_ft": 18.0,
+    "service_zone_depth_ft": 5.0,
+    "service_cluster_max_offset_ft": 60.0,
+    "target_residual_pocket_max_sf": 180.0,
+    "minimum_unit_stack_run": 2,
+    "prefer_monotone_unit_runs": true,
+    "allow_micro_notch_fill": false,
+    "require_core_on_spine": true
+  },
+  "topology_geometry_reasoning": {
+    "interval_sampling_step_ft": 6.0,
+    "interval_merge_gap_ft": 4.0,
+    "split_detection_ratio": 0.16,
+    "depth_gradient_break_ft": 7.0,
+    "frontage_run_merge_gap_ft": 10.0,
+    "minimum_frontage_run_ft": 26.0,
+    "branch_activation_interval_count": 2,
+    "branch_area_floor_min_sf": 800.0,
+    "enable_convex_hull_concavity_metrics": true,
+    "notes": [
+      "v16 retains every filled interval on each cross-section instead of collapsing immediately to a single max depth.",
+      "Split ratio and depth-break ratio are used as topology indicators for branched, courtyard, and non-convex floor plates."
+    ]
+  },
+  "allocation_graph_defaults": {
+    "max_service_reach_ft": 145.0,
+    "target_detour_ratio": 1.18,
+    "max_detour_ratio": 1.35,
+    "target_branch_balance_ratio": 0.5,
+    "max_branch_count_soft": 4,
+    "max_frontage_run_fragment_count": 6,
+    "residual_compactness_warn_below": 0.32,
+    "prefer_single_primary_spine": true,
+    "allow_secondary_branch_spurs": true,
+    "notes": [
+      "v16 evaluates frontage runs as a graph-like spine/branch proxy without claiming to be a combinatorial exact graph solver.",
+      "Service reach is estimated along the inferred corridor detour ratio, not by final door-to-door routing."
+    ]
+  },
+  "shape_decomposition_defaults": {
+    "skeleton_sampling_step_ft": 6.0,
+    "topology_transition_break_ft": 7.0,
+    "stable_segment_merge_gap_ft": 10.0,
+    "junction_merge_radius_ft": 18.0,
+    "min_wing_span_ft": 28.0,
+    "min_hub_area_sf": 900.0,
+    "enable_cycle_detection": true,
+    "enable_declared_shape_crosscheck": true,
+    "notes": [
+      "v17 first decomposes each floor into stable topology segments before picking a shape-specific strategy.",
+      "The decomposition layer is shape-agnostic; it only reads interval-field transitions, frontage runs, and graph-like junction/cycle cues."
+    ]
+  },
+  "shape_strategy_defaults": {
+    "strategy_selection_mode_default": "declared_shape_first",
+    "allow_strategy_fallback": true,
+    "shape_match_warn_below": 0.62,
+    "hybrid_strategy_min_coverage_ratio": 0.72,
+    "max_secondary_strategies": 2,
+    "enable_shape_specific_refinement": true,
+    "bar": {
+      "min_linearity_ratio": 0.72,
+      "max_branch_count": 1,
+      "target_single_spine": true
+    },
+    "l_shape": {
+      "target_elbow_angle_deg": 90.0,
+      "elbow_angle_tolerance_deg": 24.0,
+      "arm_balance_warn_below": 0.58
+    },
+    "u_shape": {
+      "min_courtyard_open_width_ft": 38.0,
+      "min_courtyard_open_ratio": 0.16,
+      "min_arm_balance_ratio": 0.52
+    },
+    "o_shape": {
+      "min_ring_closure_ratio": 0.72,
+      "min_inner_frontage_ratio": 0.22,
+      "max_core_offset_ratio": 0.28
+    },
+    "h_shape": {
+      "min_connector_width_ft": 20.0,
+      "min_dual_bar_balance_ratio": 0.56,
+      "max_bridge_detour_ratio": 1.28
+    },
+    "tower": {
+      "target_core_area_ratio": 0.19,
+      "min_core_compactness_ratio": 0.68,
+      "min_perimeter_arc_coverage_ratio": 0.74
+    },
+    "x_shape": {
+      "min_arm_symmetry_ratio": 0.55,
+      "max_hub_offset_ft": 28.0,
+      "min_cross_balance_ratio": 0.5
+    },
+    "cluster": {
+      "max_lobe_count_soft": 5,
+      "min_connector_efficiency": 0.48,
+      "min_lobe_balance_ratio": 0.42
+    },
+    "free_form": {
+      "min_hybrid_coverage_ratio": 0.68,
+      "max_strategy_count": 3,
+      "min_common_kernel_score": 0.52
+    },
+    "perimeter_partial": {
+      "min_ring_like_coverage_ratio": 0.5,
+      "open_edge_ratio_max": 0.42,
+      "min_bar_balance_ratio": 0.5
+    }
+  },
+  "shape_common_kernel_reasoning": {
+    "stable_segment_score_formula": "1 - min(1, (stable_segment_count_estimate - 1)/7)",
+    "junction_stability_score_formula": "1 - min(1, junction_count_estimate / max(1, skeleton_edge_count_estimate + ring_count_estimate))",
+    "cycle_consistency_score_formula": "ring_count_estimate > 0 ? split_span_ratio : (1 - 0.5*split_span_ratio)",
+    "edge_capacity_fit_formula": "min(frontage_capacity_fit, depth_capacity_fit) * service_reach_score",
+    "common_kernel_score_formula": "0.24*allocation_score_v15 + 0.24*topology_score_v16 + 0.18*stable_segment_score + 0.18*junction_stability_score + 0.16*cycle_consistency_score",
+    "notes": [
+      "The common kernel remains shape-agnostic and only uses graph-like invariants extracted from the floor plate.",
+      "Shape-specific logic is applied only after the common kernel has produced a decomposition, capacities, and a morphology graph proxy."
+    ]
+  },
+  "shape_specific_strategy_reasoning": {
+    "bar_strategy_fit": "0.45*linearity_ratio + 0.20*(1-split_ratio_mean) + 0.15*run_continuity_score + 0.20*(1-branch_penalty)",
+    "l_shape_strategy_fit": "0.35*elbow_angle_score + 0.35*arm_balance_ratio + 0.15*run_continuity_score + 0.15*service_reach_score",
+    "u_shape_strategy_fit": "0.30*courtyard_open_ratio + 0.30*arm_balance_ratio + 0.20*run_continuity_score + 0.20*detour_score",
+    "o_shape_strategy_fit": "0.40*ring_closure_ratio + 0.20*inner_frontage_ratio + 0.20*service_reach_score + 0.20*residual_compactness_estimate",
+    "h_shape_strategy_fit": "0.30*dual_bar_balance_ratio + 0.25*connector_score + 0.25*run_balance_score + 0.20*detour_score",
+    "tower_strategy_fit": "0.35*core_compactness_ratio + 0.35*perimeter_arc_coverage_ratio + 0.15*service_reach_score + 0.15*(1-branch_penalty)",
+    "x_shape_strategy_fit": "0.35*arm_symmetry_ratio + 0.25*hub_offset_score + 0.20*run_balance_score + 0.20*detour_score",
+    "cluster_strategy_fit": "0.30*lobe_balance_ratio + 0.30*connector_efficiency_ratio + 0.20*service_reach_score + 0.20*residual_compactness_estimate",
+    "free_form_strategy_fit": "0.40*hybrid_coverage_ratio + 0.20*best_strategy_fit + 0.20*common_kernel_score + 0.20*service_reach_score",
+    "notes": [
+      "Every specific strategy consumes the same common-kernel objects: stable segments, inferred graph, capacities, and v16 topology summaries.",
+      "v17 does not claim exact mixed-integer packing; the strategy layer is still schematic but far more explicit than the pre-v17 heuristic bundles."
+    ]
+  },
+  "buildable_envelope_defaults": {
+    "default_front_setback_ft": 10.0,
+    "default_side_setback_ft": 8.0,
+    "default_rear_setback_ft": 10.0,
+    "min_clear_neck_ft": 24.0,
+    "min_sliver_area_sf": 45.0,
+    "max_offset_repair_iterations": 4,
+    "enable_self_intersection_repair": true,
+    "enable_narrow_neck_split": true,
+    "enable_sliver_pruning": true,
+    "frontage_priority_mode_default": "explicit_edges_first",
+    "notes": [
+      "Envelope construction in v18 begins from the actual site polygon, not from a bounding box surrogate.",
+      "Concave offsets, narrow necks, self-intersections, and slivers are repaired before topology decomposition proceeds."
+    ]
+  },
+  "constructive_topology_defaults": {
+    "decomposition_stack_default": "cdt_dual_clearance_hybrid",
+    "mesh_target_edge_ft": 12.0,
+    "clearance_probe_step_ft": 4.0,
+    "min_habitable_band_depth_ft": 24.0,
+    "target_habitable_band_depth_ft": 32.0,
+    "min_service_band_depth_ft": 8.0,
+    "max_band_fragment_count": 6,
+    "allow_ring_cells": true,
+    "allow_branch_cells": true,
+    "enable_cell_graph_serialization": true,
+    "notes": [
+      "The main v18 constructive stack uses constrained triangulation as the canonical polygon subdivision, then filters the dual graph by clearance and frontage opportunity.",
+      "Straight skeleton remains an optional experimental path, not the default runtime contract."
+    ]
+  },
+  "corridor_graph_defaults": {
+    "routing_mode_default": "spine_tree_with_loop_repair",
+    "min_corridor_clear_width_ft": 6.0,
+    "branch_penalty_per_ft": 0.12,
+    "dead_end_soft_max_ft": 24.0,
+    "dead_end_hard_max_ft": 48.0,
+    "connector_length_soft_max_ft": 36.0,
+    "entry_to_core_soft_max_ft": 120.0,
+    "max_connector_count": 4,
+    "enable_loop_repair": true,
+    "enable_crossover_connectors": true,
+    "notes": [
+      "Corridor routing is no longer a single scalar length estimate; it is a graph construction problem over cell-graph nodes.",
+      "Loop repair is bounded and deterministic, and is used only when branch penalties or dead-end lengths exceed target bands."
+    ]
+  },
+  "space_packing_defaults": {
+    "packing_mode_default": "frontage_slot_dp_with_clip_repair",
+    "frontage_slot_step_ft": 2.0,
+    "corner_unit_bonus_weight": 0.14,
+    "accessible_unit_target_ratio": 0.05,
+    "max_typology_switches_per_run": 3,
+    "service_reserve_depth_ft": 8.0,
+    "amenity_frontage_priority_weight": 0.2,
+    "allow_unit_depth_stretch_within_band": true,
+    "max_local_clip_repair_moves": 8,
+    "notes": [
+      "V18 chooses band-graph + frontage-slot dynamic programming as the main constructive packing solver.",
+      "Rectangle packing is retained only as a local clipping primitive for some service spaces, not as the main polygon reasoning model."
+    ]
+  },
+  "residual_handling_defaults": {
+    "usable_min_area_sf": 90.0,
+    "service_convertible_min_area_sf": 45.0,
+    "merge_gap_ft": 4.0,
+    "discard_sliver_area_sf": 25.0,
+    "trigger_repair_compactness_below": 0.42,
+    "acute_wedge_angle_deg": 42.0,
+    "max_discardable_ratio": 0.06,
+    "enable_pocket_conversion": true,
+    "force_service_on_acute_wedges": true,
+    "notes": [
+      "Residual cells are explicitly classified as usable, service-convertible, mergeable, discardable, or trigger-repair.",
+      "Acute wedges and low-value pockets are converted to service uses first before being discarded."
+    ]
+  },
+  "adjacency_shaft_defaults": {
+    "enable_wet_wall_pairing": true,
+    "max_wet_wall_offset_ft": 12.0,
+    "shaft_capture_radius_ft": 16.0,
+    "kitchen_bath_affinity_weight": 0.65,
+    "bath_bath_affinity_weight": 0.75,
+    "must_repair_if_accessible_unit_unpaired": true,
+    "hard_fail_if_shaft_unreachable": false,
+    "max_shaft_detour_ft": 40.0,
+    "notes": [
+      "V18 still uses adjacency proxies rather than full room-interior exact layouts, but wet-wall and shaft affinity are now constructive filters and repair triggers.",
+      "The shaft graph is a vertical continuity object; unreachable wet clusters are not merely soft penalties anymore."
+    ]
+  },
+  "vertical_continuity_defaults": {
+    "enable_stack_propagation": true,
+    "transfer_floor_local_repair_only": true,
+    "max_stack_drift_ft": 4.0,
+    "max_family_repack_levels": 2,
+    "podium_to_tower_reseed_threshold": 0.28,
+    "require_core_lock_across_typicals": true,
+    "require_shaft_lock_across_typicals": true,
+    "allow_partial_family_split": true,
+    "notes": [
+      "Typical floors propagate locked core/shaft anchors first, then local floor-cell repacking occurs around them.",
+      "Podium-to-tower transfer remains local-first; a full multi-floor global solve is still deferred."
+    ]
+  },
+  "search_repair_defaults": {
+    "candidate_generation_mode": "shape_seeded_topology_repair",
+    "max_candidates": 24,
+    "max_local_repair_rounds": 4,
+    "max_neighborhood_moves_per_round": 10,
+    "max_total_iterations": 80,
+    "tie_break_mode": "score_then_repair_count_then_frontage_loss_then_level_index",
+    "stop_on_first_feasible": false,
+    "enable_multi_floor_repair": true,
+    "manual_review_after_iteration_cap": true,
+    "notes": [
+      "Search is bounded, deterministic, and lexicographically tie-broken.",
+      "Repair neighborhoods are intentionally local and inspectable; v18 does not adopt a fully global stochastic optimizer."
+    ]
+  },
+  "constructive_solver_stack": {
+    "version": "v19",
+    "stack": [
+      "geometry normalization / canonicalization",
+      "morphology sensing and morphology graph",
+      "shape interpretation with common-kernel + shape-pack conflict resolution",
+      "topology zoning graph",
+      "core/corridor/egress/service graph",
+      "allocation graph",
+      "constructive packing",
+      "bounded local repair",
+      "vertical propagation",
+      "feasibility freeze"
+    ],
+    "notes": [
+      "v19 preserves the polygon-aware constructive substrate from v18.",
+      "v19 adds iterative convergence and invalidation rather than replacing the constructive substrate."
+    ]
+  },
+  "constructive_topology_reasoning": {
+    "buildable_envelope_score_formula": "0.40*self_intersection_repair_score + 0.30*sliver_pruning_score + 0.30*neck_clearance_score",
+    "constructive_partition_score_formula": "0.35*cell_validity_ratio + 0.25*habitable_band_fit + 0.20*service_band_fit + 0.20*corridor_band_fit",
+    "topology_constructive_score_formula": "0.30*buildable_envelope_score + 0.30*constructive_partition_score + 0.20*topology_score_v16 + 0.20*common_kernel_score_v17",
+    "notes": [
+      "V18 converts topology from a score-only layer into a constructive cell-graph layer.",
+      "Legacy v15/v16/v17 scores remain useful as priors and tie-breaks, not as the primary constructor."
+    ]
+  },
+  "corridor_graph_reasoning": {
+    "spine_score_formula": "1 - min(1, max_dead_end_ft / dead_end_hard_max_ft)",
+    "path_coverage_score_formula": "egress_coverage_ratio * (1 - branch_penalty_ratio)",
+    "connector_efficiency_formula": "1 - min(1, connector_count / max_connector_count)",
+    "corridor_graph_score_formula": "0.35*spine_score + 0.35*path_coverage_score + 0.15*(1-path_overlap_ratio) + 0.15*connector_efficiency_score",
+    "notes": [
+      "Entry, lobby, core, stair, and branch coverage are evaluated on the graph that the solver itself constructs.",
+      "The graph is separate from the evaluator so dead-end and detour issues can trigger repair moves."
+    ]
+  },
+  "space_packing_reasoning": {
+    "unit_frontage_fit_formula": "packed_frontage_ft / required_frontage_ft",
+    "service_conversion_score_formula": "convertible_residual_area_sf / max(total_residual_area_sf, 1)",
+    "wet_wall_affinity_score_formula": "0.55*wet_wall_pairing_score + 0.45*shaft_affinity_score",
+    "space_packing_score_formula": "0.35*unit_frontage_fit_score + 0.20*service_conversion_score + 0.20*residual_utilization_ratio + 0.25*wet_wall_affinity_score",
+    "notes": [
+      "Packing is performed over frontage slots and cell bands, then repaired locally with clip-and-merge moves.",
+      "Corner premium and accessible-unit variants are explicit modifiers inside the DP objective."
+    ]
+  },
+  "repair_search_reasoning": {
+    "candidate_generation": [
+      "shape-seeded candidates",
+      "topology-seeded corridor variants",
+      "packing-seeded typology run variants"
+    ],
+    "repair_moves": [
+      "split_or_merge_cell",
+      "promote_service_pocket",
+      "insert_connector",
+      "move_core_anchor_locally",
+      "repack_frontage_run",
+      "propagate_stack_lock"
+    ],
+    "tie_break": "lexicographic(score, repair_count, frontage_loss, level_index, candidate_id)",
+    "notes": [
+      "The repair engine is intentionally bounded and deterministic to stay inspectable in Rust and in repo-side diagnostics.",
+      "If a floor exhausts the iteration cap, v18 marks it for manual review rather than pretending the search converged."
+    ]
+  },
+  "geometry_normalization_defaults": {
+    "snap_ft": 0.5,
+    "dedupe_vertex_ft": 0.25,
+    "collinear_angle_epsilon_deg": 4.0,
+    "min_edge_length_ft": 1.5,
+    "max_non_simple_repair_rounds": 3,
+    "allow_self_intersection_repair": true,
+    "allow_component_split": true,
+    "preserve_frontage_tags": true
+  },
+  "morphology_sensing_defaults": {
+    "sweep_step_ft": 4.0,
+    "cross_section_step_ft": 4.0,
+    "stable_segment_merge_gap_ft": 8.0,
+    "min_frontage_run_ft": 10.0,
+    "reflex_cluster_radius_ft": 10.0,
+    "cycle_detection_mode": "hybrid",
+    "max_interval_samples": 256,
+    "enable_morphology_graph_serialization": true
+  },
+  "shape_interpretation_defaults": {
+    "declared_vs_inferred_mode": "hybrid",
+    "shape_confidence_warn_below": 0.68,
+    "shape_confidence_fail_below": 0.5,
+    "max_candidate_shape_packs": 3,
+    "allow_common_kernel_fallback": true,
+    "allow_shape_pack_hybridization": true,
+    "mismatch_routes_to_unclear": true,
+    "require_shape_signature_stability": true,
+    "restart_on_shape_switch": true
+  },
+  "topology_zoning_defaults": {
+    "habitable_band_target_ft": 30.0,
+    "circulation_band_target_ft": 8.0,
+    "service_band_target_ft": 8.0,
+    "courtyard_edge_bias": 0.25,
+    "exterior_frontage_bias": 0.8,
+    "residual_prezone_min_area_sf": 40.0,
+    "max_zone_fragment_count": 8,
+    "allow_courtyard_facing_habitable_band": true,
+    "notch_zone_service_first": true
+  },
+  "core_corridor_egress_defaults": {
+    "core_candidate_mode": "centroid_branch_hybrid",
+    "corridor_family_mode": "hybrid",
+    "egress_graph_mode": "core_spine_exit_graph",
+    "service_reach_mode": "shaft_aware",
+    "max_entry_to_core_ft": 120.0,
+    "max_dead_end_ft": 40.0,
+    "max_service_detour_ft": 55.0,
+    "allow_multicore_balancing": true,
+    "allow_loop_corridor": true
+  },
+  "topology_iteration_defaults": {
+    "max_global_rounds": 7,
+    "max_layer_restarts": 6,
+    "shape_switch_restart_limit": 2,
+    "local_repair_round_budget": 4,
+    "oscillation_window": 4,
+    "convergence_gain_epsilon": 0.015,
+    "partial_freeze_after_round": 3,
+    "enable_stack_round_f": true,
+    "manual_review_after_round_g_if_unstable": true
+  },
+  "invalidation_defaults": {
+    "hard_overwrite_layers": [
+      "geometry_normalization"
+    ],
+    "soft_feedback_layers": [
+      "shape_interpretation",
+      "topology_zoning",
+      "core_corridor_egress",
+      "allocation_graph",
+      "constructive_packing",
+      "local_repair",
+      "vertical_consistency"
+    ],
+    "penalty_only_layers": [
+      "feasibility_contract"
+    ],
+    "upstream_invalidation_budget": 5,
+    "local_invalidation_radius_ft": 24.0,
+    "allow_shape_invalidate_morphology_once": true,
+    "allow_routing_invalidate_zoning": true,
+    "allow_packing_invalidate_routing": true,
+    "quarantine_unstable_local_zones": true
+  },
+  "freeze_policy_defaults": {
+    "freeze_layer_after_stable_rounds": 2,
+    "floor_local_freeze_threshold": 0.92,
+    "stack_freeze_threshold": 0.94,
+    "max_unfrozen_rounds": 7,
+    "allow_partial_floor_freeze": true,
+    "allow_stack_freeze_with_local_exceptions": true,
+    "local_exception_area_ratio_max": 0.12,
+    "global_restart_on_oscillation": true
+  },
+  "topology_layer_reasoning": {
+    "layer_0_geometry_normalization": "Canonicalizes polygon input, resolves non-simple conditions, and preserves only contract-safe frontage tags. This layer is common and may hard-overwrite downstream geometry state.",
+    "layer_1_morphology_sensing": "Builds morphology signatures, interval samples, frontage runs, and morphology graph on top of canonical geometry. This layer is common and is allowed to re-sample after one shape-triggered restart.",
+    "layer_2_shape_interpretation": "Chooses declared/inferred/hybrid shape packs. This layer is shape-aware but cannot rewrite canonical geometry; it can only request bounded upstream restarts.",
+    "layer_3_topology_zoning": "Assigns habitable/circulation/service/void/residual pre-zones over the common kernel graph. This layer is common with shape-biased weights.",
+    "layer_4_core_corridor_egress": "Solves core/corridor/service graphs over zoning. Shape packs may bias family selection but routing validity remains common-kernel governed.",
+    "layer_5_allocation_graph": "Creates compatibility, adjacency, forbidden-adjacency, and typology run graphs used by constructive packing.",
+    "layer_6_constructive_packing": "Runs frontage-slot and cell-band assignment with coupled service/core/corridor placement.",
+    "layer_7_local_repair": "Applies bounded local repairs and decides whether to keep, rollback, or request targeted upstream invalidation.",
+    "layer_8_vertical_consistency": "Propagates stable states across floor families, transfer floors, and quarantined exceptions.",
+    "layer_9_feasibility_contract": "Collects unresolved contradictions into unclear zones and protects repo/project-doc ownership boundaries."
+  },
+  "convergence_reasoning": {
+    "rounds": {
+      "A": "geometry and morphology stabilization",
+      "B": "shape interpretation and zoning stabilization",
+      "C": "core/corridor/egress/service stabilization",
+      "D": "allocation and constructive packing stabilization",
+      "E": "local repair and reconciliation",
+      "F": "vertical propagation and family reconciliation",
+      "G": "feasibility freeze"
+    },
+    "stability_metrics": [
+      "geometry_delta_area_ratio",
+      "morphology_signature_delta",
+      "shape_pack_switch_count",
+      "zone_label_churn_ratio",
+      "corridor_graph_edit_ratio",
+      "assignment_churn_ratio",
+      "repair_yield_score",
+      "stack_drift_ratio"
+    ],
+    "stop_rule": "Stop when hard conflicts are resolved or quarantined, weighted convergence gain drops below epsilon for two consecutive rounds, and no oscillation fingerprint is active.",
+    "restart_rule": "Restart locally when shape pack switches, core count changes, or routing invalidates zoning beyond budget. Restart globally only when oscillation persists after freeze rollback."
+  },
+  "layer_interface_contracts": {
+    "layer_0_to_1": {
+      "handoff": "CanonicalFloorGeometry -> MorphologyState",
+      "allowed_feedback": "shape-triggered single re-sample only",
+      "sidecar_emit": [
+        "canonical_polygon_stats",
+        "offset_repair_trace",
+        "component_split_trace"
+      ]
+    },
+    "layer_1_to_2": {
+      "handoff": "MorphologyState -> ShapeInterpretationState",
+      "allowed_feedback": "shape mismatch can request one morphology resample",
+      "sidecar_emit": [
+        "morphology_signature",
+        "frontage_runs",
+        "branch_cycle_flags"
+      ]
+    },
+    "layer_2_to_3": {
+      "handoff": "ShapeInterpretationState -> ZoningState",
+      "allowed_feedback": "routing/packing may request strategy fallback or hybridization",
+      "sidecar_emit": [
+        "declared_vs_inferred_scores",
+        "selected_shape_pack",
+        "fallback_trace"
+      ]
+    },
+    "layer_3_to_4": {
+      "handoff": "ZoningState -> RoutingState",
+      "allowed_feedback": "routing may relabel service pockets and circulation bands",
+      "sidecar_emit": [
+        "zone_graph",
+        "zone_fragment_counts",
+        "residual_prezones"
+      ]
+    },
+    "layer_4_to_5": {
+      "handoff": "RoutingState -> AllocationGraphState",
+      "allowed_feedback": "packing may request corridor move or branch reduction",
+      "sidecar_emit": [
+        "core_candidate_graph",
+        "corridor_graph",
+        "egress_service_metrics"
+      ]
+    },
+    "layer_5_to_6": {
+      "handoff": "AllocationGraphState -> ConstructivePartitionState",
+      "allowed_feedback": "repair may relabel compatibility weights and forbidden adjacencies",
+      "sidecar_emit": [
+        "allocation_graph",
+        "typology_runs",
+        "compatibility_edges"
+      ]
+    },
+    "layer_6_to_7": {
+      "handoff": "ConstructivePartitionState -> LocalRepairState",
+      "allowed_feedback": "repair is bounded and cannot rewrite geometry directly",
+      "sidecar_emit": [
+        "packing_trace",
+        "frontage_assignment_trace",
+        "residual_trace"
+      ]
+    },
+    "layer_7_to_8": {
+      "handoff": "LocalRepairState -> VerticalConsistencyState",
+      "allowed_feedback": "vertical layer may trigger sibling repair or quarantine",
+      "sidecar_emit": [
+        "repair_moves",
+        "rollback_trace",
+        "local_quarantine_map"
+      ]
+    },
+    "layer_8_to_9": {
+      "handoff": "VerticalConsistencyState -> FeasibilityContractState",
+      "allowed_feedback": "feasibility can only emit warnings/manual-review/deferred routing",
+      "sidecar_emit": [
+        "stack_propagation_trace",
+        "divergence_budget_trace",
+        "manual_review_flags"
+      ]
+    }
+  },
+  "structural_system_defaults": {
+    "family_candidates": [
+      "bearing_wall",
+      "corridor_wall_plus_perimeter",
+      "column_slab",
+      "shear_wall_core_plus_columns",
+      "podium_transfer_hybrid"
+    ],
+    "construction_type_bias": {
+      "type_v": "bearing_wall",
+      "type_iii": "corridor_wall_plus_perimeter",
+      "type_v_over_i": "podium_transfer_hybrid",
+      "type_iii_over_i": "podium_transfer_hybrid",
+      "type_i": "column_slab"
+    },
+    "core_lateral_bias": {
+      "bar": "shear_wall_core",
+      "l_shape": "distributed_walls",
+      "u_shape": "distributed_walls",
+      "o_shape": "dual_core",
+      "h_shape": "dual_core",
+      "tower": "shear_wall_core",
+      "x_shape": "dual_core",
+      "cluster": "distributed_walls",
+      "free_form": "distributed_walls",
+      "perimeter_partial": "distributed_walls"
+    },
+    "auto_family_resolution_weights": {
+      "span_fit": 0.28,
+      "unit_module_fit": 0.18,
+      "corridor_support_fit": 0.14,
+      "core_shear_alignment": 0.14,
+      "transfer_compatibility": 0.1,
+      "facade_interrupt_penalty_inverse": 0.08,
+      "bay_repeatability": 0.08
+    }
+  },
+  "structural_topology_defaults": {
+    "primary_system_mode": "auto",
+    "core_lateral_system_mode": "auto",
+    "structure_drives_core": true,
+    "structure_drives_corridor": true,
+    "enable_bay_graph": true,
+    "enable_transfer_zone_reasoning": true,
+    "enable_column_keepout_projection": true,
+    "torsion_proxy_mode": "centroid_stiffness_proxy",
+    "serialize_structural_sidecar": true
+  },
+  "structural_bay_defaults": {
+    "target_bay_width_ft_by_family": {
+      "bearing_wall": 22.0,
+      "corridor_wall_plus_perimeter": 24.0,
+      "column_slab": 28.0,
+      "shear_wall_core_plus_columns": 27.0,
+      "podium_transfer_hybrid": 26.0
+    },
+    "target_bay_depth_ft_by_family": {
+      "bearing_wall": 28.0,
+      "corridor_wall_plus_perimeter": 30.0,
+      "column_slab": 32.0,
+      "shear_wall_core_plus_columns": 30.0,
+      "podium_transfer_hybrid": 31.0
+    },
+    "bay_width_tolerance_ft": 4.0,
+    "bay_depth_tolerance_ft": 6.0,
+    "max_residential_clear_span_ft": 34.0,
+    "max_corridor_cantilever_ft": 10.0,
+    "column_keepout_radius_ft": 1.5,
+    "bearing_wall_zone_ft": 0.75,
+    "allow_nonorthogonal_bays": true,
+    "bay_fit_warn_below": 0.72,
+    "bay_fit_fail_below": 0.48
+  },
+  "transfer_structure_defaults": {
+    "enable_transfer_floor_reasoning": true,
+    "transfer_band_depth_ft": 12.0,
+    "max_transfer_offset_ft": 8.0,
+    "allow_podium_to_tower_grid_shift": true,
+    "max_column_shift_per_transfer_ft": 10.0,
+    "transfer_penalty_weight": 0.8,
+    "core_lock_above_transfer": true,
+    "full_repack_on_transfer_failure": false,
+    "local_repair_only_when_shift_below_ft": 6.0
+  },
+  "structure_room_coupling_defaults": {
+    "max_column_intrusion_into_bedroom_ft": 0.75,
+    "max_column_intrusion_into_living_ft": 1.0,
+    "wet_wall_alignment_tolerance_ft": 2.0,
+    "kitchen_bath_stack_preference": 0.75,
+    "service_zone_under_beam_first": true,
+    "allow_minor_room_notch_if_closet_absorbs": true,
+    "room_structural_fit_warn_below": 0.7,
+    "room_structural_fit_fail_below": 0.45,
+    "beam_drop_service_capture_target": 0.65
+  },
+  "structural_formula_registry": {
+    "required": [
+      "structural_family_score",
+      "bay_grid_axis_inference",
+      "bay_fit_score",
+      "load_path_continuity_score",
+      "cantilever_burden_ratio",
+      "column_keepout_ratio",
+      "transfer_offset_penalty",
+      "room_structural_fit_score",
+      "wet_wall_stack_alignment_score",
+      "service_under_beam_capture_ratio",
+      "structure_driven_core_shift_penalty",
+      "torsion_proxy_penalty"
+    ],
+    "notes": [
+      "All formulas remain schematic/pre-DD proxies.",
+      "These formulas are used for generator guidance, bounded search ranking, and unclear-zone routing; they are not permit-level structural analysis."
+    ]
+  },
+  "shape_structural_strategy_reasoning": {
+    "bar": {
+      "preferred_family": "corridor_wall_plus_perimeter",
+      "secondary_family": "bearing_wall",
+      "grid_rule": "align corridor spine with one primary support line; units should repeat by bay multiples along frontage runs."
+    },
+    "l_shape": {
+      "preferred_family": "corridor_wall_plus_perimeter",
+      "secondary_family": "podium_transfer_hybrid",
+      "grid_rule": "solve each wing on its own support axis and couple them at the elbow with a support-bridge node."
+    },
+    "u_shape": {
+      "preferred_family": "corridor_wall_plus_perimeter",
+      "secondary_family": "podium_transfer_hybrid",
+      "grid_rule": "stabilize two parallel wing grids before solving the court base bar."
+    },
+    "o_shape": {
+      "preferred_family": "shear_wall_core_plus_columns",
+      "secondary_family": "column_slab",
+      "grid_rule": "maintain ring continuity and avoid unsupported interior court corners."
+    },
+    "h_shape": {
+      "preferred_family": "shear_wall_core_plus_columns",
+      "secondary_family": "corridor_wall_plus_perimeter",
+      "grid_rule": "treat the connector as service/support biased unless two-bar stability is preserved."
+    },
+    "tower": {
+      "preferred_family": "column_slab",
+      "secondary_family": "shear_wall_core_plus_columns",
+      "grid_rule": "use compact core with sector bays; do not over-fragment the facade into off-module strips."
+    },
+    "x_shape": {
+      "preferred_family": "shear_wall_core_plus_columns",
+      "secondary_family": "column_slab",
+      "grid_rule": "the hub owns lateral stability; spokes inherit bay rhythm from the hub before local repair."
+    },
+    "cluster": {
+      "preferred_family": "podium_transfer_hybrid",
+      "secondary_family": "corridor_wall_plus_perimeter",
+      "grid_rule": "each lobe gets a local bay subgraph but the stack graph still tries to align shared shafts."
+    },
+    "free_form": {
+      "preferred_family": "column_slab",
+      "secondary_family": "corridor_wall_plus_perimeter",
+      "grid_rule": "derive local grids per lobe from the common kernel and switch to hybridization when one global grid collapses."
+    },
+    "perimeter_partial": {
+      "preferred_family": "corridor_wall_plus_perimeter",
+      "secondary_family": "column_slab",
+      "grid_rule": "stabilize the closed ring segment first, then solve the open edge as bar-like appendages."
+    }
+  },
+  "opening_life_safety_defaults": {
+    "enable_door_level_egress_proxy": true,
+    "enable_window_eligibility_proxy": true,
+    "route_graph_includes_door_nodes": true,
+    "unit_entry_door_clear_width_ft": 3.0,
+    "min_egress_door_separation_ft": 12.0,
+    "bedroom_window_required_for_habitable": true,
+    "min_habitable_window_frontage_ft": 8.0,
+    "smoke_lobby_on_highrise": true,
+    "common_path_warn_ratio": 0.9,
+    "allow_service_doors_on_dead_end_pockets": false,
+    "window_ineligible_edge_tags": [
+      "fire_wall",
+      "zero_lot_line",
+      "mechanical_screen_blocked",
+      "service_only"
+    ]
+  },
+  "vertical_access_topology_defaults": {
+    "stair_placement_mode": "auto",
+    "elevator_grouping_mode": "auto",
+    "shaft_anchor_mode": "hybrid",
+    "max_stair_to_unit_entry_travel_ft": 250.0,
+    "max_shaft_branch_length_ft": 45.0,
+    "prefer_core_near_entry_lobby": true,
+    "prefer_stair_at_branch_tips": true,
+    "allow_secondary_microshaft": false,
+    "repack_if_vertical_access_fails": true
+  },
+  "roof_plan_defaults": {
+    "roof_layout_mode": "balanced",
+    "allow_occupied_roof": true,
+    "require_accessible_roof_route_if_occupied": true,
+    "reserve_elevator_overrun_zone": true,
+    "reserve_stair_overrun_zone": true,
+    "reserve_mechanical_screen_zone": true,
+    "min_guard_offset_ft": 6.0,
+    "min_mechanical_buffer_to_amenity_ft": 12.0,
+    "pool_allowed_by_construction_type": {
+      "type_v": false,
+      "type_iii": false,
+      "type_v_over_i": true,
+      "type_iii_over_i": true,
+      "type_i": true
+    },
+    "solar_pv_priority": "balanced",
+    "mechanical_over_amenity_priority": true
+  },
+  "site_exterior_layout_defaults": {
+    "accessible_route_mode": "direct_to_primary_entry",
+    "fire_access_mode": "auto",
+    "service_loading_mode": "screened_side",
+    "landscape_open_space_priority": "balanced",
+    "min_entry_forecourt_depth_ft": 18.0,
+    "min_fire_access_clear_width_ft": 20.0,
+    "dog_run_allowed": true,
+    "play_area_allowed": true,
+    "pool_deck_allowed": true,
+    "allow_exterior_amenity_on_residual_courts": true
+  },
+  "parking_layout_defaults": {
+    "surface_stall_layout_mode": "hybrid",
+    "structured_parking_coupling_mode": "auto",
+    "accessible_stall_near_entry_bias": true,
+    "max_surface_parking_frontage_share": 0.3,
+    "reserve_dropoff_before_surface_stalls": true,
+    "allow_tandem_service_stalls": false,
+    "ramp_throat_reservation_ft": 28.0,
+    "stall_count_strict": true,
+    "surface_priority_order": [
+      "accessible_near_entry",
+      "dropoff",
+      "forecourt",
+      "resident_stalls",
+      "visitor_stalls",
+      "service_stalls"
+    ]
+  },
+  "yield_envelope_defaults": {
+    "far_optimization_mode": "balanced",
+    "dwelling_unit_cap_mode": "hard",
+    "story_height_mode": "material_sensitive",
+    "default_residential_story_height_ft": 10.5,
+    "podium_story_height_ft": 13.5,
+    "open_space_tradeoff_weight": 0.3,
+    "parking_tradeoff_weight": 0.2,
+    "story_height_by_construction_type": {
+      "type_v": 10.5,
+      "type_iii": 10.5,
+      "type_v_over_i": 10.7,
+      "type_iii_over_i": 10.7,
+      "type_i": 10.8
+    }
+  },
+  "material_topology_defaults": {
+    "construction_type_strategy_mode": "auto",
+    "material_family_by_construction_type": {
+      "type_v": "wood_frame_bar",
+      "type_iii": "light_gauge_perimeter_wall",
+      "type_v_over_i": "podium_wood_hybrid",
+      "type_iii_over_i": "podium_type_iii_hybrid",
+      "type_i": "concrete_tower_core"
+    },
+    "structure_material_bias_by_type": {
+      "type_v": "wood_frame",
+      "type_iii": "light_gauge",
+      "type_v_over_i": "hybrid",
+      "type_iii_over_i": "hybrid",
+      "type_i": "concrete"
+    },
+    "fire_separation_drives_core": true,
+    "podium_transfer_required_for_mixed_types": true,
+    "max_wood_wing_depth_ft": 34.0,
+    "max_concrete_tower_floorplate_sf": 18000.0,
+    "preferred_shaft_wall_system_by_type": {
+      "type_v": "rated_wall",
+      "type_iii": "rated_wall",
+      "type_v_over_i": "hybrid",
+      "type_iii_over_i": "hybrid",
+      "type_i": "concrete_core"
+    },
+    "noncombustible_podium_bias": true
+  },
+  "amenity_open_space_defaults": {
+    "indoor_amenity_priority": "balanced",
+    "outdoor_amenity_priority": "balanced",
+    "min_common_open_space_sf_per_du": 35.0,
+    "min_landscape_ratio": 0.2,
+    "amenity_daylight_priority_weight": 0.6,
+    "preserve_quiet_open_space_from_dropoff": true,
+    "allow_indoor_amenity_on_ground_frontage": true,
+    "allow_outdoor_amenity_above_podium": true
+  },
+  "opening_life_safety_reasoning": {
+    "door_node_graph": "Corridor graph is refined with unit-entry, stair-lobby, roof-access, and exterior-discharge door nodes before common-path and dead-end burden are evaluated.",
+    "window_eligibility_proxy": "Habitable frontage is only counted on edges that remain window-eligible after fire/no-window/service/mechanical filters are applied.",
+    "non_goal": "V21 is still not a final door-swing, hardware-set, smoke-control, or room-by-room operable-window legality checker."
+  },
+  "roof_site_reasoning": {
+    "roof_priority_order": [
+      "egress_and_overrun",
+      "mechanical_and_screen",
+      "required_accessible_route",
+      "required_occupied_amenity",
+      "pv_and_secondary_use",
+      "residual_reuse"
+    ],
+    "site_exterior_priority_order": [
+      "accessible_route",
+      "entry_forecourt",
+      "fire_access",
+      "service_loading",
+      "landscape_open_space",
+      "surface_parking",
+      "exterior_amenity",
+      "utility_keepout"
+    ]
+  },
+  "material_strategy_reasoning": {
+    "type_v": "Shorter spans, stronger bearing-wall/corridor-wall bias, lower roof occupancy confidence, and stronger depth penalties on long wings.",
+    "type_iii": "Perimeter wall / rated wall bias with similar wing-depth caution but slightly higher noncombustible edge tolerance than type V.",
+    "type_v_over_i": "Podium-to-wood hybrid with transfer sensitivity, strong podium parking coupling, and rooftop amenity only if transfer and access remain stable.",
+    "type_iii_over_i": "Hybrid podium + type III upper stack with transfer-floor bias similar to type V over I but slightly stronger noncombustible perimeter preference.",
+    "type_i": "Column-slab / concrete-core friendly, larger span tolerance, better tower/roof/mechanical support, and weaker frontage penalties from columns when core is stable."
+  },
+  "progressive_layer_defaults": {
+    "stage_order": [
+      "stage_0_coarse",
+      "stage_1_backbone",
+      "stage_2_allocation",
+      "stage_3_exactification"
+    ],
+    "coarse_variable_budget_default": 32,
+    "backbone_variable_budget_default": 56,
+    "allocation_variable_budget_default": 88,
+    "exactification_variable_budget_default": 24,
+    "inherit_previous_stage_solution_default": true,
+    "activate_fine_stage_below_score_default": 0.78,
+    "exactification_default_mode": "targeted_local",
+    "notes": [
+      "Later stages inherit geometry labels, corridor/core anchors, and zone classifications from earlier stages.",
+      "Stage 3 exactification is only activated on flagged local clusters unless manual override requires more."
+    ]
+  },
+  "runtime_budget_defaults": {
+    "max_global_passes_default": 4,
+    "max_stage_retries_default": 2,
+    "max_local_repair_passes_default": 2,
+    "freeze_after_stable_passes_default": 1,
+    "major_break_score_delta_default": 0.14,
+    "limit_full_floor_repack_count_default": 1,
+    "skip_stage_if_inputs_unchanged_default": true,
+    "roof_site_run_after_floor_freeze_default": true,
+    "material_recheck_only_on_transfer_change_default": true
+  },
+  "exactification_defaults": {
+    "door_window_refinement_mode_default": "room_cluster",
+    "shaft_core_selection_mode_default": "graph_rank_then_local_search",
+    "roof_refinement_mode_default": "amenity_mechanical_balance",
+    "parking_surface_distribution_mode_default": "frontage_preserving",
+    "open_space_refinement_mode_default": "quiet_zone_preserving",
+    "material_class_refinement_mode_default": "bay_and_transfer",
+    "door_clearance_proxy_depth_ft_default": 4.0,
+    "window_cluster_min_openable_frontage_ft_default": 8.0,
+    "shaft_candidate_limit_per_floor_default": 4,
+    "parking_aisle_conflict_trigger_default": 0.3,
+    "roof_mechanical_conflict_trigger_default": 0.22
+  },
+  "layer_inheritance_policy": {
+    "inherit_geometry_partition": true,
+    "inherit_zone_labels": true,
+    "inherit_core_corridor_anchor": true,
+    "inherit_structural_family": true,
+    "inherit_site_reservations_after_floor_freeze": true,
+    "allow_local_override_without_full_floor_repack": true,
+    "notes": [
+      "A later stage may only invalidate the immediately previous stage unless a major-break condition is met.",
+      "Roof/site/parking/open-space runs consume the frozen floor-stack state rather than reopening massing by default."
+    ]
+  },
+  "loop_reduction_policy": {
+    "preferred_strategy": "stage_skip_then_local_repair",
+    "full_repack_trigger": [
+      "major_core_shift",
+      "transfer_floor_break",
+      "egress_unreachable_after_local_repair",
+      "parking_or_open_space_governor_hard_fail"
+    ],
+    "skip_conditions": [
+      "unchanged_polygon_signature",
+      "unchanged_shape_pack_selection",
+      "unchanged_material_family",
+      "unchanged_transfer_state"
+    ],
+    "notes": [
+      "The engine should prefer fewer global passes with higher-quality inherited states over wide repeated search.",
+      "Exactification never reopens stage 0 directly; it escalates to stage 2 or a bounded full-floor repack only when required."
+    ]
+  },
+  "shape_family_allocation_defaults": {
+    "require_shape_specific_pack_on_complex_shapes": true,
+    "minimum_common_kernel_score": 0.62,
+    "minimum_shape_pack_fit_score": 0.64,
+    "maximum_strategy_fallback_ratio": 0.35,
+    "allow_hybrid_pack_on_free_form": true,
+    "allow_common_kernel_only_on_bar_tower": true,
+    "require_wing_or_lobe_partition_on_branched_shapes": true,
+    "maximum_unresolved_branch_count": 1
+  },
+  "allocation_completeness_defaults": {
+    "require_dwelling_on_upper_residential_floors": true,
+    "require_circulation_on_occupied_floors": true,
+    "require_vertical_anchor_on_above_grade_floors": true,
+    "allow_support_cluster_every_n_typical_floors": 3,
+    "allow_amenity_omission_when_target_zero": true,
+    "minimum_required_category_hit_ratio": 0.8,
+    "fail_on_missing_dwelling_typical": true,
+    "count_loading_as_service": true
+  },
+  "typical_floor_equivalence_defaults": {
+    "compare_within_family_id": true,
+    "max_gross_area_delta_ratio": 0.03,
+    "max_allocated_area_delta_ratio": 0.05,
+    "harmonize_before_exactification_exit": true,
+    "inherit_representative_partition": true,
+    "allow_local_exception_quarantine": true,
+    "minimum_partition_reuse_ratio": 0.7,
+    "max_unharmonized_typical_floor_count": 1
+  },
+  "floor_space_utilization_defaults": {
+    "minimum_buildable_coverage_ratio": 0.9,
+    "maximum_unallocated_ratio": 0.08,
+    "maximum_discardable_sliver_ratio": 0.03,
+    "convert_convertible_residual_before_discard": true,
+    "require_area_ledger_closure": true,
+    "closure_tolerance_ratio": 0.01,
+    "prefer_fill_low_frontage_pockets_with_support": true,
+    "force_full_floor_repair_if_below_target": true
+  },
+  "space_overlap_defaults": {
+    "detection_mode": "bbox_then_polygon_proxy",
+    "maximum_overlap_ratio": 0.005,
+    "maximum_overlap_pair_count_per_floor": 0,
+    "shared_boundary_tolerance_ft": 0.25,
+    "run_overlap_repair_before_freeze": true,
+    "repair_mode": "local_clip_then_band_split",
+    "spatial_hash_cell_ft": 12.0,
+    "fail_on_remaining_overlap_after_repair": true
+  },
+  "shape_family_allocation_reasoning": {
+    "simple_shape_fast_path": [
+      "bar",
+      "tower"
+    ],
+    "complex_shape_requires_pack": [
+      "h_shape",
+      "x_shape",
+      "cluster",
+      "free_form",
+      "perimeter_partial"
+    ],
+    "shape_readiness_score_formula": "0.35*common_kernel_score + 0.35*shape_pack_fit_score + 0.15*allocation_score_v15 + 0.15*space_packing_score_v18",
+    "fallback_rule": "allow common-kernel fallback only when declared shape is simple or hybrid coverage remains above threshold",
+    "notes": [
+      "v23 turns shape coverage into an allocation-readiness gate rather than a score-only diagnostic.",
+      "A complex declared shape with frequent fallback is routed to unclear instead of being treated as silently acceptable."
+    ]
+  },
+  "allocation_completeness_reasoning": {
+    "upper_residential_required": [
+      "Dwelling Units",
+      "Circulation",
+      "Vertical Anchor"
+    ],
+    "podium_required": [
+      "Circulation",
+      "Vertical Anchor"
+    ],
+    "below_grade_required": [
+      "Service or Parking Anchor"
+    ],
+    "support_cluster_policy": "support rooms may be clustered every N typical floors if the family remains vertically served",
+    "notes": [
+      "v23 checks floor-role-based completeness before declaring a floor layout-ready.",
+      "The completeness gate is deterministic and sidecar-visible."
+    ]
+  },
+  "typical_floor_equivalence_reasoning": {
+    "representative_floor_selection": "choose the sibling floor with the lowest closure error and no overlap conflicts as representative",
+    "gross_area_delta_formula": "abs(gross_area_i - gross_area_rep) / max(gross_area_rep, 1)",
+    "allocated_area_delta_formula": "abs(allocated_area_i - allocated_area_rep) / max(allocated_area_rep, 1)",
+    "harmonization_policy": "attempt local crop/fill on residual pockets before broad family repack",
+    "notes": [
+      "v23 treats family_id as the first-class comparison key for typical-floor equivalence.",
+      "Transfer floors and quarantined exception floors are excluded from forced equality."
+    ]
+  },
+  "space_utilization_reasoning": {
+    "area_ledger": [
+      "buildable_area",
+      "allocated_area",
+      "unallocated_area",
+      "convertible_residual_area",
+      "discardable_sliver_area"
+    ],
+    "closure_error_formula": "abs(buildable_area - allocated_area - unallocated_area) / max(buildable_area, 1)",
+    "utilization_policy": "convert residuals to support/circulation before discarding as slivers",
+    "notes": [
+      "v23 requires a floor-level area ledger so the solver can no longer hide unused space behind aggregate scores.",
+      "Coverage and closure are reported per floor and at the project aggregate level."
+    ]
+  },
+  "space_overlap_reasoning": {
+    "detection_stack": [
+      "spatial_hash",
+      "bbox_candidate_pairs",
+      "polygon_or_rect_proxy_intersection",
+      "local_clip_or_band_split"
+    ],
+    "remaining_overlap_routing": "any overlap above tolerance after repair becomes postsolve unclear",
+    "notes": [
+      "v23 enforces non-overlap as a sidecar-visible integrity gate.",
+      "Robust polygon boolean handling for arbitrary non-convex and curved cells remains deferred."
+    ]
+  },
+  "polygon_kernel_defaults": {
+    "snap_grid_ft": 0.0625,
+    "collinear_epsilon_ft": 0.02,
+    "self_touch_split_epsilon_ft": 0.1,
+    "minimum_edge_ft": 0.5,
+    "sliver_area_sf": 6.0,
+    "max_boolean_rounds": 3,
+    "enable_integer_arrangement_kernel": true,
+    "resolve_pseudo_courtyard_mode": "bridge_then_split",
+    "exact_overlap_mode": "integer_arrangement"
+  },
+  "curved_canonicalization_defaults": {
+    "enabled": true,
+    "chord_tolerance_ft": 0.25,
+    "max_arc_segment_angle_deg": 7.5,
+    "radial_axis_snap_deg": 2.5,
+    "minimum_arc_radius_ft": 2.0,
+    "unsupported_curve_policy": "route_unclear_zone"
+  },
+  "dwelling_unit_room_solver_defaults": {
+    "enabled": true,
+    "lod_target": "room_buildable",
+    "room_program_source": "unit_type_templates",
+    "max_rooms_per_unit": 10,
+    "max_layout_rounds": 3,
+    "entry_strip_depth_ft": 5.0,
+    "wet_wall_strip_depth_ft": 7.0,
+    "hall_min_width_ft": 3.0,
+    "minimum_bedroom_width_ft": 9.0,
+    "minimum_living_frontage_ft": 10.0,
+    "minimum_room_program_coverage_ratio": 0.9,
+    "maximum_manual_review_unit_ratio": 0.2
+  },
+  "room_topology_defaults": {
+    "enforce_living_dining_kitchen_chain": true,
+    "enforce_bedroom_privacy_graph": true,
+    "enforce_bath_adjacency_legality": true,
+    "wet_wall_cluster_strategy": "cluster_then_assign",
+    "entry_sequence_mode": "foyer_then_public_then_private",
+    "max_internal_circulation_turns": 4,
+    "bath_access_mode": "mixed",
+    "kitchen_visibility_mode": "semi_open"
+  },
+  "volumetric_room_defaults": {
+    "default_slab_to_slab_ft": 10.0,
+    "default_clear_height_ft": 8.5,
+    "allow_vertical_void": true,
+    "allow_double_height": true,
+    "allow_mezzanine": true,
+    "double_height_min_clear_ft": 19.0,
+    "mezzanine_depth_limit_ratio": 0.45,
+    "roof_room_height_ft": 12.0,
+    "void_alignment_mode": "align_to_core_or_amenity"
+  },
+  "inter_floor_coupling_defaults": {
+    "enable_duplex": true,
+    "enable_skip_stop": true,
+    "enable_split_level": true,
+    "max_duplex_fraction": 0.12,
+    "max_skip_stop_gap_levels": 2,
+    "shaft_reserve_alignment_tolerance_ft": 1.0,
+    "transfer_topology_mode": "preserve_core_then_rebridge",
+    "inter_floor_stair_width_ft": 4.0,
+    "allow_inter_floor_bedroom_stack_shift": false
+  },
+  "opening_fixture_shaft_mep_defaults": {
+    "door_clear_width_ft": 2.6667,
+    "entry_door_depth_reserve_ft": 4.0,
+    "interior_door_depth_reserve_ft": 2.5,
+    "window_min_habitable_width_ft": 3.0,
+    "bath_fixture_clearance_ft": 2.5,
+    "kitchen_fixture_clearance_ft": 3.0,
+    "shaft_reserve_depth_ft": 2.5,
+    "duct_transfer_zone_depth_ft": 3.0,
+    "structure_beam_keepout_ft": 1.0,
+    "require_window_for_habitable_rooms": true,
+    "require_fixture_clearance_exactification": true
+  },
+  "room_exact_non_overlap_defaults": {
+    "enabled": true,
+    "pairwise_overlap_tolerance_sf": 0.25,
+    "fixture_overlap_tolerance_sf": 0.05,
+    "opening_overlap_tolerance_sf": 0.05,
+    "max_repair_rounds": 2,
+    "repair_mode": "trim_then_shift",
+    "fail_on_remaining_overlap": true,
+    "use_polygon_kernel_for_room_checks": true
+  },
+  "room_program_templates": {
+    "studio": {
+      "rooms": [
+        "entry",
+        "bath_1",
+        "kitchen",
+        "living_sleep",
+        "storage"
+      ],
+      "target_area_ratio": {
+        "entry": 0.08,
+        "bath_1": 0.12,
+        "kitchen": 0.14,
+        "living_sleep": 0.58,
+        "storage": 0.08
+      },
+      "minimum_frontage_rooms": [
+        "living_sleep"
+      ],
+      "wet_wall_rooms": [
+        "bath_1",
+        "kitchen"
+      ]
+    },
+    "one_bedroom": {
+      "rooms": [
+        "entry",
+        "hall",
+        "bath_1",
+        "kitchen",
+        "living_dining",
+        "bedroom_1",
+        "storage"
+      ],
+      "target_area_ratio": {
+        "entry": 0.05,
+        "hall": 0.09,
+        "bath_1": 0.1,
+        "kitchen": 0.12,
+        "living_dining": 0.32,
+        "bedroom_1": 0.25,
+        "storage": 0.07
+      },
+      "minimum_frontage_rooms": [
+        "living_dining",
+        "bedroom_1"
+      ],
+      "wet_wall_rooms": [
+        "bath_1",
+        "kitchen"
+      ]
+    },
+    "two_bedroom": {
+      "rooms": [
+        "entry",
+        "hall",
+        "bath_1",
+        "bath_2",
+        "kitchen",
+        "living_dining",
+        "bedroom_1",
+        "bedroom_2",
+        "laundry"
+      ],
+      "target_area_ratio": {
+        "entry": 0.04,
+        "hall": 0.08,
+        "bath_1": 0.07,
+        "bath_2": 0.06,
+        "kitchen": 0.1,
+        "living_dining": 0.27,
+        "bedroom_1": 0.18,
+        "bedroom_2": 0.16,
+        "laundry": 0.04
+      },
+      "minimum_frontage_rooms": [
+        "living_dining",
+        "bedroom_1",
+        "bedroom_2"
+      ],
+      "wet_wall_rooms": [
+        "bath_1",
+        "bath_2",
+        "kitchen",
+        "laundry"
+      ]
+    },
+    "three_bedroom": {
+      "rooms": [
+        "entry",
+        "hall",
+        "bath_1",
+        "bath_2",
+        "kitchen",
+        "living_dining",
+        "bedroom_1",
+        "bedroom_2",
+        "bedroom_3",
+        "laundry"
+      ],
+      "target_area_ratio": {
+        "entry": 0.04,
+        "hall": 0.08,
+        "bath_1": 0.06,
+        "bath_2": 0.06,
+        "kitchen": 0.09,
+        "living_dining": 0.24,
+        "bedroom_1": 0.16,
+        "bedroom_2": 0.13,
+        "bedroom_3": 0.11,
+        "laundry": 0.03
+      },
+      "minimum_frontage_rooms": [
+        "living_dining",
+        "bedroom_1",
+        "bedroom_2"
+      ],
+      "wet_wall_rooms": [
+        "bath_1",
+        "bath_2",
+        "kitchen",
+        "laundry"
+      ]
+    }
+  },
+  "polygon_kernel_reasoning": {
+    "core_stack": [
+      "snap to single tolerance grid before any boolean or overlap stage",
+      "remove duplicate and collinear vertices before topology reasoning",
+      "detect self-touch and pseudo-courtyard signatures before declaring polygon simple",
+      "prefer integer arrangement exactification for room and floor overlap checks",
+      "route non-canonical curves and unresolved self-touch to unclear zones"
+    ],
+    "fast_paths": [
+      "rect-rect exact overlap",
+      "orthogonal simple polygon arrangement",
+      "room-level partition by exact strip decomposition"
+    ],
+    "slow_paths": [
+      "pseudo-courtyard bridge-then-split",
+      "free-form notch resolution after chordization",
+      "manual review when curve semantics remain ambiguous"
+    ]
+  },
+  "curved_canonicalization_reasoning": {
+    "intent": [
+      "carry arc/radial semantics separately from plain polygon snapshots",
+      "convert curves to deterministic chordized rings before arrangement build",
+      "snap radial sectors to shared local axes when possible"
+    ],
+    "defer_policy": [
+      "unsupported spline/nurbs remains non-canonical in v24",
+      "aggressive polygonization allowed only for sidecar analysis, not legal green-light"
+    ]
+  },
+  "room_level_solver_stack": {
+    "stages": [
+      "unit envelope canonicalization",
+      "room program derivation",
+      "entry/wet-wall strip reservation",
+      "room chain constructive partition",
+      "opening/fixture reserve insertion",
+      "exact non-overlap repair",
+      "volumetric coupling and shaft/slab reconciliation"
+    ],
+    "inheritance": {
+      "room_solver_inherits_from": [
+        "shape_family_allocation",
+        "space_packing",
+        "structure_room_coupling",
+        "opening_life_safety",
+        "progressive_topology"
+      ],
+      "volumetric_solver_inherits_from": [
+        "vertical_access",
+        "transfer_structure",
+        "roof_plan",
+        "material_topology"
+      ]
+    },
+    "bounded_loops": {
+      "room_layout_rounds": 3,
+      "non_overlap_repair_rounds": 2,
+      "volumetric_reconcile_rounds": 1
+    }
+  },
+  "volumetric_topology_reasoning": {
+    "vertical_features": [
+      "double-height public/amenity/lobby volumes",
+      "mezzanine bounded by depth ratio and head-height reserve",
+      "duplex and skip-stop couplings on same family stacks",
+      "shaft reserve volumes spanning served floors",
+      "slab openings for shafts, stairs, and inter-floor unit links"
+    ],
+    "limits": [
+      "exact structural transfer slab geometry still deferred",
+      "exact smoke/egress coupling for double-height atria still deferred",
+      "exact beam/duct collision in 3D remains bounded-proxy in v24"
+    ]
+  },
+  "unit_room_legality_bands": {
+    "entry_clear_min_ft": 3.0,
+    "hall_clear_min_ft": 3.0,
+    "bedroom_min_width_ft": 9.0,
+    "living_min_frontage_ft": 10.0,
+    "bath_cluster_depth_ft": 7.0,
+    "kitchen_cluster_depth_ft": 8.0
+  },
+  "progressive_solve_defaults": {
+    "enabled": true,
+    "maximum_pass": "p9_stack_bounded",
+    "freeze_floor_topology_after": "p3",
+    "topology_first_geometry_later": true,
+    "lazy_exactness": true,
+    "exactify_dirty_regions_only": true,
+    "representative_floor_first": true,
+    "representative_unit_class_first": true,
+    "allow_early_stop_when_confident": true,
+    "require_same_semantics_across_profiles": true
+  },
+  "pass_execution_defaults": {
+    "run_p0": true,
+    "run_p1": true,
+    "run_p2": true,
+    "run_p3": true,
+    "run_p4": true,
+    "run_p5": true,
+    "run_p6": true,
+    "run_p7": true,
+    "run_p8": true,
+    "run_p9": true,
+    "run_p10": true,
+    "allow_pass_skip": true,
+    "allow_local_restart_without_global_restart": true,
+    "max_project_restarts": 1,
+    "max_floor_restarts": 2,
+    "max_unit_restarts": 2
+  },
+  "escalation_trigger_defaults": {
+    "geometry_complexity_threshold": 0.52,
+    "proxy_disagreement_threshold": 0.06,
+    "candidate_margin_threshold": 0.12,
+    "repair_oscillation_threshold": 2,
+    "vertical_dependency_trigger_count": 1,
+    "manual_review_unit_ratio_trigger": 0.18,
+    "room_overlap_area_trigger_sf": 10.0,
+    "corridor_detour_trigger_ratio": 0.22,
+    "activate_polygon_kernel_on_complex_shapes": true
+  },
+  "confidence_stopping_defaults": {
+    "floor_ready_min_conf": 0.8,
+    "room_ready_min_conf": 0.78,
+    "stack_ready_min_conf": 0.82,
+    "stability_min_conf": 0.8,
+    "max_uncertainty_mass_ratio": 0.08,
+    "require_exact_tier_t3_for_room_ready": true,
+    "require_exact_tier_t4_for_stack_ready": true,
+    "stop_when_no_critical_violations": true,
+    "fallback_mode": "room_exactified_stack_bounded"
+  },
+  "repair_ladder_defaults": {
+    "allow_candidate_switch": true,
+    "allow_coarse_topology_repair": true,
+    "allow_allocation_repair": true,
+    "allow_unit_envelope_repair": true,
+    "allow_room_topology_repair": true,
+    "allow_geometry_exact_repair": true,
+    "allow_vertical_repair": true,
+    "max_local_moves": 8,
+    "max_candidate_switches": 2,
+    "max_vertical_repairs": 2,
+    "rollback_policy": "candidate_first"
+  },
+  "solve_profile_defaults": {
+    "fast_preview": {
+      "profile": "fast_preview",
+      "target_exactness_tier": "t1_topology",
+      "time_budget_ms": 1200,
+      "beam_multiplier": 0.7,
+      "allow_anytime_cutoff": true,
+      "prefer_representative_projection": true,
+      "enable_hotspot_3d_only_on_demand": true
+    },
+    "balanced": {
+      "profile": "balanced",
+      "target_exactness_tier": "t3_local_exact_2d",
+      "time_budget_ms": 3500,
+      "beam_multiplier": 1.0,
+      "allow_anytime_cutoff": true,
+      "prefer_representative_projection": true,
+      "enable_hotspot_3d_only_on_demand": true
+    },
+    "deep_validation": {
+      "profile": "deep_validation",
+      "target_exactness_tier": "t4_stack_bounded_25d",
+      "time_budget_ms": 8000,
+      "beam_multiplier": 1.3,
+      "allow_anytime_cutoff": false,
+      "prefer_representative_projection": true,
+      "enable_hotspot_3d_only_on_demand": true
+    },
+    "research": {
+      "profile": "research",
+      "target_exactness_tier": "t5_hotspot_3d",
+      "time_budget_ms": 20000,
+      "beam_multiplier": 1.8,
+      "allow_anytime_cutoff": false,
+      "prefer_representative_projection": false,
+      "enable_hotspot_3d_only_on_demand": false
+    }
+  },
+  "dirty_region_defaults": {
+    "recompute_only_dirty_regions": true,
+    "min_hotspot_area_sf": 18.0,
+    "neighborhood_buffer_ft": 6.0,
+    "merge_distance_ft": 4.0,
+    "max_dirty_regions_per_floor": 24,
+    "full_floor_recompute_trigger_ratio": 0.28
+  },
+  "candidate_beam_defaults": {
+    "floor_candidate_beam": 4,
+    "representative_floor_beam": 5,
+    "unit_class_beam": 3,
+    "room_variant_beam": 2,
+    "repair_beam": 2,
+    "prune_margin": 0.04,
+    "keep_second_candidate_when_margin_below": 0.1
+  },
+  "local_exact_subset_defaults": {
+    "enable_orthogonal_subset": true,
+    "enable_monotone_concave_subset": true,
+    "enable_simple_holes_subset": true,
+    "max_vertices_per_hotspot": 36,
+    "max_boolean_rounds": 4,
+    "unsupported_subset_policy": "route_unclear"
+  },
+  "representative_solution_defaults": {
+    "cluster_typical_floors": true,
+    "cluster_unit_classes": true,
+    "max_representative_floors": 4,
+    "max_representative_unit_classes": 12,
+    "sibling_projection_tolerance_ratio": 0.06,
+    "require_family_master_floor": true,
+    "quarantine_exceptions": true
+  },
+  "hotspot_3d_defaults": {
+    "enable_hotspot_3d": true,
+    "trigger_on_transfer_floor": true,
+    "trigger_on_void_or_double_height": true,
+    "trigger_on_mezzanine": true,
+    "trigger_on_stair_stack": true,
+    "max_hotspot_solids": 12,
+    "clash_policy": "prism_and_opening",
+    "allow_local_3d_rollback": true
+  },
+  "progressive_pass_stack": {
+    "passes": [
+      {
+        "id": "P0",
+        "name": "canonicalization",
+        "cost_tier": "very_low",
+        "commit": "geometry_base"
+      },
+      {
+        "id": "P1",
+        "name": "morphology_sensing",
+        "cost_tier": "very_low",
+        "commit": "shape_features"
+      },
+      {
+        "id": "P2",
+        "name": "core_corridor_unit_skeleton",
+        "cost_tier": "low",
+        "commit": "floor_backbone_hypotheses"
+      },
+      {
+        "id": "P3",
+        "name": "floor_topology_commit",
+        "cost_tier": "low",
+        "commit": "provisional_floor_topology"
+      },
+      {
+        "id": "P4",
+        "name": "unit_envelope_topology",
+        "cost_tier": "medium",
+        "commit": "unit_class_and_entry_frontage_state"
+      },
+      {
+        "id": "P5",
+        "name": "rough_room_partition",
+        "cost_tier": "medium",
+        "commit": "room_proto"
+      },
+      {
+        "id": "P6",
+        "name": "exact_2d_hotspot_subset",
+        "cost_tier": "high",
+        "commit": "local_exact_2d"
+      },
+      {
+        "id": "P7",
+        "name": "constraint_refinement",
+        "cost_tier": "high",
+        "commit": "opening_wet_access_reserves"
+      },
+      {
+        "id": "P8",
+        "name": "repair_reconciliation",
+        "cost_tier": "adaptive",
+        "commit": "stabilized_local_solution"
+      },
+      {
+        "id": "P9",
+        "name": "inter_floor_25d_coupling",
+        "cost_tier": "high",
+        "commit": "stack_bounded_vertical_state"
+      },
+      {
+        "id": "P10",
+        "name": "hotspot_3d_exactification",
+        "cost_tier": "very_high",
+        "commit": "local_hotspot_3d"
+      }
+    ],
+    "macro_loops": [
+      "Loop A — coarse topology",
+      "Loop B — interior topology",
+      "Loop C — vertical coupling",
+      "Loop D — freeze / export"
+    ]
+  },
+  "progressive_solve_reasoning": {
+    "principles": [
+      "topology-first geometry-later",
+      "lazy exactness",
+      "dirty-region exactification",
+      "representative solve then sibling projection",
+      "bounded repair before global rollback",
+      "same semantics across profiles; depth differs, meaning does not"
+    ],
+    "stop_metrics": [
+      "topology edit delta",
+      "violation delta",
+      "uncertainty mass ratio",
+      "candidate margin",
+      "stack divergence",
+      "repair churn index"
+    ]
+  },
+  "performance_profile_reasoning": {
+    "fast_preview": "P0-P3 mandatory, P4 representative-only, no P10.",
+    "balanced": "P0-P8 default, P9 selective, P10 hotspot-only when triggered.",
+    "deep_validation": "P0-P10 on triggered zones with stronger local exact subset.",
+    "research": "same semantics as deep_validation but wider beams and larger budgets."
+  },
+  "orchestrator_module_architecture": {
+    "recommended_crates": [
+      "geom-kernel",
+      "topology-kernel",
+      "floor-allocation",
+      "unit-topology",
+      "room-partition",
+      "vertical-coupling",
+      "repair-engine",
+      "solve-orchestrator",
+      "sidecar-export"
+    ],
+    "state_policy": "immutable pass snapshots with explicit diff, dirty-region invalidation, and bounded candidate beams",
+    "trace_policy": "every stop, escalation, reject, repair, and invalidation must be sidecar-visible"
+  }
+}
