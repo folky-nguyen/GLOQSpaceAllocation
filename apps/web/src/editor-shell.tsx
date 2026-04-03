@@ -120,6 +120,26 @@ function getViewLabel(view: ViewMode, level: Level, sitePlanLevel: Level | null)
   return `${level.name} Floor Plan`;
 }
 
+function getSpaceDisplayName(spaceName: string): string {
+  const trimmedName = spaceName.trim();
+  const floorMarkerIndex = trimmedName.toLowerCase().lastIndexOf(" @ floor ");
+  const withoutFloorMarker = floorMarkerIndex >= 0
+    ? trimmedName.slice(0, floorMarkerIndex).trim()
+    : trimmedName;
+  const parts = withoutFloorMarker.split(" / ");
+
+  if (parts.length <= 2) {
+    return withoutFloorMarker;
+  }
+
+  const displayName = parts.slice(2).join(" / ").trim();
+  return displayName.length > 0 ? displayName : withoutFloorMarker;
+}
+
+function formatSpaceAreaSqFt(areaSqFt: number): string {
+  return `${areaSqFt.toFixed(2)} sf`;
+}
+
 function getSelectionLabel(
   selection: Selection,
   activeLevel: Level,
@@ -134,7 +154,7 @@ function getSelectionLabel(
   }
 
   if (selection.kind === "element" && selectedSpaces[0]) {
-    return selectedSpaces[0].name;
+    return getSpaceDisplayName(selectedSpaces[0].name);
   }
 
   if (selection.kind === "element-set" && selectedSpaces.length > 0) {
@@ -1293,10 +1313,10 @@ export default function EditorShell() {
                                 points={getPlanPolygonPoints(space.footprint, sitePlanBounds)}
                               />
                               <text className="plan-space-label" x={labelPoint.x} y={labelPoint.y - 4} textAnchor="middle">
-                                {space.name}
+                                {getSpaceDisplayName(space.name)}
                               </text>
                               <text className="plan-space-metrics" x={labelPoint.x} y={labelPoint.y + 10} textAnchor="middle">
-                                {getSpaceAreaSqFt(space)} sf
+                                {formatSpaceAreaSqFt(getSpaceAreaSqFt(space))}
                               </text>
                             </g>
                           );
@@ -1370,10 +1390,10 @@ export default function EditorShell() {
                               points={getPlanPolygonPoints(space.footprint, floorPlanBounds)}
                             />
                             <text className="plan-space-label" x={labelPoint.x} y={labelPoint.y - 4} textAnchor="middle">
-                              {space.name}
+                              {getSpaceDisplayName(space.name)}
                             </text>
                             <text className="plan-space-metrics" x={labelPoint.x} y={labelPoint.y + 10} textAnchor="middle">
-                              {getSpaceAreaSqFt(space)} sf
+                              {formatSpaceAreaSqFt(getSpaceAreaSqFt(space))}
                             </text>
                           </g>
                         );

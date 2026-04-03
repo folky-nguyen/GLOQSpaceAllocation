@@ -5595,7 +5595,7 @@ pub fn generator_room_required_standby_kva(
             + a.boh.electrical_generator_optional_start_kva,
     ]
     .into_iter()
-    .fold(0.0, f64::max);
+    .fold(0.0_f64, |acc, value| acc.max(*value));
     worst_case_inst_kva / a.boh.electrical_generator_site_factor.max(EPS)
         * (1.0 + a.boh.electrical_generator_growth_ratio)
 }

@@ -37,8 +37,8 @@ function createSampleCase(
 export const MIXED_CASES: SampleCaseManifest[] = [
   createSampleCase({
     id: "mixed-case-1",
-    label: "Case 1: Angled Lot",
-    description: "Single-story site plan on an angled lot with four apartments inside the default 5 ft setback footprint.",
+    label: "Case 1: Engine-Generated Site Plan",
+    description: "One-level site plan generated from the layout engine on a 104 ft by 72 ft parcel with default 5 ft setbacks.",
     preferredView: "site-plan",
     preferredActiveLevelId: "level-1",
     raw: mixedCase1Raw
