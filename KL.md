@@ -42,6 +42,12 @@ Selective glossary for specialized repo and workflow concepts. Use this file for
 ### `site edge setback`
 - AI: The per-edge inset distance applied to a `SitePlan` boundary. The repo uses these values to offset each boundary edge inward and derive the buildable footprint polygon.
 - HM: null
+### `road frontage flag`
+- AI: A boolean aligned to one `SitePlan` boundary edge that marks whether that parcel edge touches a public road frontage. The planned site-layout algorithm uses these flags to form frontage chains, choose the primary public face, and bias building, parking, and walkway placement.
+- HM: null
+### `frontage chain`
+- AI: One contiguous run of parcel edges whose `road frontage flag` is `true`. The future layout algorithm uses the longest chain as the primary frontage and treats the others as secondary public faces.
+- HM: null
 ## 3. Data Semantics
 ### `canonical`
 - AI: The authored source of truth owned by the TypeScript editor, currently the persisted `ProjectDoc` shape and its directly edited fields.

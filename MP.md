@@ -121,6 +121,7 @@ Combined repo map and document index. This is the first lookup surface for non-b
 - `017.01 shared level headers and aligned actions.md`: redesign the `Levels` list with one shared desktop header row and straighter button columns.
 - `018 draggable workspace windows.md`: move all current floating workspace dialogs onto one shared header-drag seam so `Levels`, `Unit`, and `Test` can all be dragged inside the workspace.
 - `019 engine-generated sample site plan.md`: replace one mixed sample with a layout-engine-generated site-plan fixture and keep the mixed validation surface at three cases.
+- `020 road frontage driven site layout algorithm.md`: define the frontage-aware algorithm for deriving a building footprint, surface parking stalls, and outside walkways from parcel edges tagged with road adjacency.
 - `KL001 KL glossary structure and update workflow.md`: define the selective `KL.md` glossary format, the `AI`/`HM` entry split, and the workflow rule for updating `KL.md` when new specialized concepts are introduced.
 
 ### Bug Notes
